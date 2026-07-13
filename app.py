@@ -3,9 +3,13 @@
 Run with:  streamlit run app.py
 """
 
+from datetime import date
+
 import streamlit as st
 
 from core.analysis import AnalysisResult, ask, configure_llm, load_dataframe
+from core.report_docx import export_docx
+from core.report_pdf import export_pdf
 from core.settings import GROQ_API_KEY, LLM_MODEL, UPLOADS_DIR
 
 st.set_page_config(page_title="Freelance Auto-Report", page_icon="📊", layout="wide")
@@ -35,6 +39,7 @@ if "llm_ready" not in st.session_state:
 uploaded = st.file_uploader("Upload your data file", type=["csv", "xlsx", "xls"])
 
 df = None
+dataset_name = uploaded.name if uploaded is not None else "dataset"
 if uploaded is not None:
     saved_path = UPLOADS_DIR / uploaded.name
     saved_path.write_bytes(uploaded.getbuffer())
@@ -87,5 +92,29 @@ if st.session_state.history:
         render(item)
         st.divider()
 
-    # Export buttons land here in the next step (PDF via WeasyPrint, Word via python-docx)
-    st.button("Export Report (coming next)", disabled=True)
+    # ------------------------------------------------------------ export
+    st.subheader("Export Report")
+    report_title = st.text_input("Report title", value="Data Analysis Report")
+    results = list(reversed(st.session_state.history))  # newest first, same as on screen
+    stem = f"{report_title.strip().replace(' ', '_') or 'report'}_{date.today():%Y-%m-%d}"
+
+    col_pdf, col_docx = st.columns(2)
+    with col_pdf:
+        try:
+            pdf_bytes = export_pdf(results, report_title, dataset_name)
+            st.download_button(
+                "⬇️ Download PDF", pdf_bytes, file_name=f"{stem}.pdf",
+                mime="application/pdf", use_container_width=True,
+            )
+        except Exception as exc:
+            st.error(f"PDF export failed: {exc}")
+    with col_docx:
+        try:
+            docx_bytes = export_docx(results, report_title, dataset_name)
+            st.download_button(
+                "⬇️ Download Word", docx_bytes, file_name=f"{stem}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+            )
+        except Exception as exc:
+            st.error(f"Word export failed: {exc}")

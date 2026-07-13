@@ -11,8 +11,8 @@ report. A lightweight replacement for Power BI/Tableau on freelance gigs.
   and auto chart generation
 - **LiteLLM → Groq** as the LLM provider (free/cheap tier)
 - **Streamlit** for the UI
-- **WeasyPrint** for branded PDF export *(coming next)*
-- **python-docx** for branded Word export *(coming next)*
+- **WeasyPrint** for branded PDF export
+- **python-docx** for branded Word export
 
 ## Setup
 
@@ -37,6 +37,15 @@ streamlit run app.py
 1. Upload a `.csv` / `.xlsx` / `.xls` file
 2. Type a question, e.g. *"Plot monthly revenue by region as a bar chart"*
 3. Get the chart + a written insight; results stack up as a session history
+4. Set a report title and download the whole session as a branded **PDF** or
+   **Word** report
+
+## Branding
+
+All report branding lives in `core/branding.py` — name, navy/gold colors,
+and the "Prepared by Sahil" footer watermark. Drop your logo at
+`assets/logo.png` and it appears in the PDF header and Word header
+automatically; until then reports show a navy/gold monogram.
 
 Uploaded files and generated charts are written to `uploads/` and `exports/`,
 both git-ignored — client data never gets committed.
@@ -45,5 +54,5 @@ both git-ignored — client data never gets committed.
 
 - [x] Step 1 — project skeleton (`requirements.txt`, `.env.example`, `.gitignore`)
 - [x] Step 2 — MVP: upload → PandasAI Q&A → chart in Streamlit
-- [ ] Step 3 — branded PDF export (WeasyPrint HTML/CSS template)
-- [ ] Step 4 — branded Word export (python-docx template)
+- [x] Step 3 — branded PDF export (WeasyPrint HTML/CSS template)
+- [x] Step 4 — branded Word export (python-docx template)
