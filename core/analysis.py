@@ -4,6 +4,7 @@ Keeps all pandasai specifics out of the Streamlit layer so the export
 modules (PDF/Word) can reuse the same AnalysisResult objects later.
 """
 
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,6 +57,27 @@ def load_dataframe(path: str | Path) -> pai.DataFrame:
     raise ValueError(f"Unsupported file type: {suffix} (use .csv, .xlsx or .xls)")
 
 
+def _chat_with_retry(df: pai.DataFrame, prompt: str, attempts: int = 3):
+    """df.chat that waits out Groq free-tier rate limits instead of failing.
+
+    Groq's error message includes "Please try again in Xs"; honor it,
+    with a cap so a huge suggested wait can't hang the UI.
+    """
+    for attempt in range(attempts):
+        try:
+            return df.chat(prompt)
+        except Exception as exc:
+            message = str(exc)
+            is_rate_limit = (
+                "RateLimitError" in type(exc).__name__ or "rate_limit" in message
+            )
+            if not is_rate_limit or attempt == attempts - 1:
+                raise
+            match = re.search(r"try again in ([\d.]+)s", message)
+            wait = float(match.group(1)) + 1 if match else 20
+            time.sleep(min(wait, 65))
+
+
 def ask(df: pai.DataFrame, question: str) -> AnalysisResult:
     """Run one natural-language question and normalize the response.
 
@@ -63,7 +85,7 @@ def ask(df: pai.DataFrame, question: str) -> AnalysisResult:
     chart also carries a written insight for the report.
     """
     try:
-        response = df.chat(question)
+        response = _chat_with_retry(df, question)
     except Exception as exc:  # pandasai raises many provider-specific errors
         return AnalysisResult(question=question, kind="error", text=str(exc))
 
@@ -94,7 +116,7 @@ def _written_insight(df: pai.DataFrame, question: str) -> str:
         f"summarize the key insight from the data for this question: {question}"
     )
     try:
-        follow_up = df.chat(prompt)
+        follow_up = _chat_with_retry(df, prompt)
         if getattr(follow_up, "type", "") in ("string", "number"):
             return str(follow_up.value)
     except Exception:
