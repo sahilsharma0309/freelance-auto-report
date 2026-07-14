@@ -28,9 +28,13 @@ cp .env.example .env
 # then edit .env and paste your Groq API key (free at console.groq.com/keys)
 ```
 
-> WeasyPrint needs system libraries on Linux:
-> `sudo apt-get install libpango-1.0-0 libpangocairo-1.0-0 libcairo2`.
-> On macOS: `brew install pango`.
+> WeasyPrint needs system libraries:
+> - **Linux (Debian/Ubuntu):** `sudo apt-get install $(cat packages.txt)`
+> - **macOS:** `brew install pango`
+> - **Windows:** install the [GTK3 runtime](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases)
+>
+> On **Streamlit Community Cloud** no manual step is needed — `packages.txt`
+> at the repo root is installed automatically, so PDF export just works.
 
 ## Run
 
