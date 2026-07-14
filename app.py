@@ -9,8 +9,14 @@ import streamlit as st
 
 from core.analysis import AnalysisResult, ask, configure_llm, load_dataframe
 from core.report_docx import export_docx
-from core.report_pdf import export_pdf
 from core.settings import GROQ_API_KEY, LLM_MODEL, UPLOADS_DIR
+
+# WeasyPrint needs system libraries (GTK3 on Windows, pango/cairo on Linux).
+# If they're missing, keep the app usable and only disable PDF export.
+try:
+    from core.report_pdf import export_pdf
+except OSError:
+    export_pdf = None
 
 st.set_page_config(page_title="Freelance Auto-Report", page_icon="📊", layout="wide")
 
@@ -100,14 +106,21 @@ if st.session_state.history:
 
     col_pdf, col_docx = st.columns(2)
     with col_pdf:
-        try:
-            pdf_bytes = export_pdf(results, report_title, dataset_name)
-            st.download_button(
-                "⬇️ Download PDF", pdf_bytes, file_name=f"{stem}.pdf",
-                mime="application/pdf", use_container_width=True,
+        if export_pdf is None:
+            st.warning(
+                "PDF export needs the GTK3 runtime on Windows. Install it from "
+                "[gtk3-runtime releases](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases) "
+                "and restart the app. Word export works without it."
             )
-        except Exception as exc:
-            st.error(f"PDF export failed: {exc}")
+        else:
+            try:
+                pdf_bytes = export_pdf(results, report_title, dataset_name)
+                st.download_button(
+                    "⬇️ Download PDF", pdf_bytes, file_name=f"{stem}.pdf",
+                    mime="application/pdf", use_container_width=True,
+                )
+            except Exception as exc:
+                st.error(f"PDF export failed: {exc}")
     with col_docx:
         try:
             docx_bytes = export_docx(results, report_title, dataset_name)
