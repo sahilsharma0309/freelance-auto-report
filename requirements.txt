@@ -1,0 +1,16 @@
+# Core: natural-language data analysis
+pandasai>=3.0.0b2          # v3 beta: pai.read_csv / df.chat API
+pandasai-litellm>=0.0.1    # LiteLLM bridge so PandasAI can talk to Groq
+python-dotenv>=1.0
+
+# UI
+streamlit>=1.35
+
+# Data file support
+pandas>=2.0
+openpyxl>=3.1              # .xlsx
+xlrd>=2.0.1                # legacy .xls
+
+# Report export (PDF + Word)
+weasyprint>=62             # HTML/CSS -> branded PDF (needs system pango/cairo libs)
+python-docx>=1.1           # branded .docx reports

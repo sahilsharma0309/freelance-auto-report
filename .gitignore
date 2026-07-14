@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- freelance-auto-report specific ---
+# Uploaded data files (client data must never be committed)
+uploads/
+*.csv
+*.xls
+*.xlsx
+
+# Generated charts, reports, and PandasAI artifacts
+exports/
+cache/
+pandasai.log
