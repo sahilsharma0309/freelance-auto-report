@@ -16,6 +16,10 @@ report. A lightweight replacement for Power BI/Tableau on freelance gigs.
 
 ## Setup
 
+> **Requires Python 3.10 or 3.11.** PandasAI v3 does not support Python 3.12+
+> yet. On Windows, install 3.11 from python.org and create the venv with
+> `py -3.11 -m venv venv`.
+
 ```bash
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
