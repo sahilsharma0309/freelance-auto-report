@@ -64,16 +64,26 @@ if df is not None:
         "Ask a question about your data",
         placeholder="e.g. Plot monthly revenue by region as a bar chart",
     )
-    if st.button("Analyze", type="primary", disabled=not question.strip()):
-        if not GROQ_API_KEY:
-            st.error("Set GROQ_API_KEY in .env first.")
-        else:
-            if not st.session_state.llm_ready:
-                configure_llm()
-                st.session_state.llm_ready = True
-            with st.spinner("Thinking..."):
-                result = ask(df, question.strip())
-            st.session_state.history.append(result)
+    col_ask, col_auto = st.columns(2)
+    with col_ask:
+        if st.button("Analyze", type="primary", disabled=not question.strip(),
+                     use_container_width=True):
+            if not GROQ_API_KEY:
+                st.error("Set GROQ_API_KEY in .env first.")
+            else:
+                if not st.session_state.llm_ready:
+                    configure_llm()
+                    st.session_state.llm_ready = True
+                with st.spinner("Thinking..."):
+                    result = ask(df, question.strip())
+                st.session_state.history.append(result)
+    with col_auto:
+        if st.button("📊 Auto-Visualize (no AI)", use_container_width=True,
+                     help="Instant branded charts + computed insights straight "
+                          "from the data — no LLM, no rate limits."):
+            from core.autoviz import auto_visualize
+            with st.spinner("Building charts..."):
+                st.session_state.history.extend(auto_visualize(df.head(100_000)))
 
 # ---------------------------------------------------------------- results
 def render(result: AnalysisResult) -> None:
