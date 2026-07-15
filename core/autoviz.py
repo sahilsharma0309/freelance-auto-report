@@ -59,10 +59,12 @@ def _save(fig: go.Figure) -> str:
     return str(path)
 
 
-def _result(title: str, fig: go.Figure, insight: str) -> AnalysisResult:
+def _result(title: str, fig: go.Figure, insight: str,
+            guide: str = "", priority: int = 5) -> AnalysisResult:
     return AnalysisResult(
         question=title, kind="chart", text=insight,
         chart_path=_save(fig), figure=fig,
+        guide=guide, priority=priority,
     )
 
 
@@ -143,7 +145,11 @@ def _trend_over_time(df, date_col, val_col) -> AnalysisResult | None:
         f"({_fmt(first)} → {_fmt(last)}), peaking at {_fmt(series.max())} "
         f"in {series.idxmax():%b %Y}."
     )
-    return _result(title, fig, insight)
+    guide = (
+        "Read left to right — each point is one period's total. Line going up "
+        "means business is growing. The gold dot marks the latest figure."
+    )
+    return _result(title, fig, insight, guide, priority=1)
 
 
 def _growth_by_period(df, date_col, val_col) -> AnalysisResult | None:
@@ -170,7 +176,12 @@ def _growth_by_period(df, date_col, val_col) -> AnalysisResult | None:
         f"Best month: {best:%b %Y} ({growth.max():+.1f}%); "
         f"toughest: {worst:%b %Y} ({growth.min():+.1f}%)."
     )
-    return _result(title, fig, insight)
+    guide = (
+        "Each bar compares one month with the month before it. A navy bar "
+        "above the line means better than last month; a gold bar below "
+        "means less than last month."
+    )
+    return _result(title, fig, insight, guide, priority=2)
 
 
 def _trend_by_category(df, date_col, val_col, cat_col) -> AnalysisResult | None:
@@ -222,7 +233,87 @@ def _trend_by_category(df, date_col, val_col, cat_col) -> AnalysisResult | None:
             f"while {min(growth, key=growth.get)} moved "
             f"{growth[min(growth, key=growth.get)]:+.1f}%."
         )
-    return _result(title, fig, insight)
+    guide = (
+        "Each colored line is one group — its name is written at the line's "
+        "end. Whichever line sits higher sold more that month; lines pulling "
+        "apart mean the gap between groups is widening."
+    )
+    return _result(title, fig, insight, guide, priority=3)
+
+
+def _month_category_heatmap(df, date_col, val_col, cat_col) -> AnalysisResult | None:
+    """Month x category heatmap — one look at who performed when."""
+    dates = pd.to_datetime(df[date_col], errors="coerce", format="mixed")
+    frame = pd.DataFrame({
+        "d": dates, "v": df[val_col], "c": df[cat_col].astype(str),
+    }).dropna()
+    if frame.empty or (frame["d"].max() - frame["d"].min()).days <= 92:
+        return None
+    top = frame.groupby("c")["v"].sum().nlargest(8).index
+    frame = frame[frame["c"].isin(top)]
+    frame["month"] = frame["d"].dt.to_period("M").dt.to_timestamp()
+    pivot = frame.pivot_table(index="c", columns="month", values="v", aggfunc="sum").fillna(0)
+    if pivot.shape[1] < 3:
+        return None
+    pivot = pivot.loc[pivot.sum(axis=1).sort_values().index]  # biggest row on top
+
+    title = f"{val_col} heatmap — {cat_col} × month"
+    fig = _base_figure(title)
+    fig.add_trace(go.Heatmap(
+        z=pivot.values, x=[f"{m:%b %y}" for m in pivot.columns], y=list(pivot.index),
+        colorscale=[[0.0, "#f6f7f9"], [1.0, PRIMARY_COLOR]],
+        hovertemplate="%{y} · %{x}: <b>%{z:,.0f}</b><extra></extra>",
+        colorbar=dict(tickfont=dict(color=MUTED)),
+    ))
+    fig.update_layout(height=max(380, 60 * len(pivot) + 160))
+
+    best_row, best_col = np.unravel_index(np.argmax(pivot.values), pivot.values.shape)
+    insight = (
+        f"The single strongest cell is {pivot.index[best_row]} in "
+        f"{pivot.columns[best_col]:%B %Y} ({_fmt(pivot.values[best_row, best_col])})."
+    )
+    guide = (
+        "Darker box = more business. Read across a row to follow one "
+        f"{cat_col} month by month; read down a column to compare everyone "
+        "in the same month."
+    )
+    return _result(title, fig, insight, guide, priority=4)
+
+
+def _weekday_pattern(df, date_col, val_col) -> AnalysisResult | None:
+    """Average business per day of the week."""
+    dates = pd.to_datetime(df[date_col], errors="coerce", format="mixed")
+    frame = pd.DataFrame({"d": dates, "v": df[val_col]}).dropna()
+    if frame.empty or frame["d"].dt.date.nunique() < 14:
+        return None
+    daily = frame.groupby(frame["d"].dt.date)["v"].sum()
+    weekdays = pd.to_datetime(pd.Series(daily.index)).dt.day_name()
+    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    averages = daily.groupby(weekdays.values).mean().reindex(order).dropna()
+    if len(averages) < 5:
+        return None
+
+    title = f"Average {val_col} by day of week"
+    fig = _base_figure(title)
+    colors = [ACCENT_COLOR if day == averages.idxmax() else PRIMARY_COLOR
+              for day in averages.index]
+    fig.add_trace(go.Bar(
+        x=list(averages.index), y=averages.values, marker_color=colors,
+        text=[_fmt(v) for v in averages.values], textposition="outside",
+        textfont=dict(color=MUTED, size=11),
+        hovertemplate="%{x}: <b>%{y:,.0f}</b> avg<extra></extra>",
+    ))
+
+    best, worst = averages.idxmax(), averages.idxmin()
+    insight = (
+        f"{best} is the strongest day on average ({_fmt(averages.max())}); "
+        f"{worst} is the quietest ({_fmt(averages.min())})."
+    )
+    guide = (
+        "Each bar is a day of the week, averaged across the whole period. "
+        "The gold bar is your best day — plan stock, staff, or offers around it."
+    )
+    return _result(title, fig, insight, guide, priority=5)
 
 
 def _bar_by_category(df, cat_col, val_col) -> AnalysisResult:
@@ -248,7 +339,11 @@ def _bar_by_category(df, cat_col, val_col) -> AnalysisResult:
         f"{top_name} leads with {_fmt(top_value)} — {share:.1f}% of all "
         f"{val_col} across {len(totals)} {cat_col} groups{note}."
     )
-    return _result(title, fig, insight)
+    guide = (
+        "Longer bar = bigger total. The gold bar at the top is the No. 1. "
+        "The number written next to each bar is its actual total."
+    )
+    return _result(title, fig, insight, guide, priority=6)
 
 
 def _distribution(df, val_col) -> AnalysisResult:
@@ -270,7 +365,12 @@ def _distribution(df, val_col) -> AnalysisResult:
         f"median of {_fmt(values.median())} and mean of {_fmt(values.mean())} "
         f"across {len(values):,} records."
     )
-    return _result(title, fig, insight)
+    guide = (
+        "This shows how the values are spread out. A tall bar means many "
+        "records fall around that amount. The gold line is the middle value — "
+        "half the records are below it, half above."
+    )
+    return _result(title, fig, insight, guide, priority=7)
 
 
 def _correlation(df, numeric) -> AnalysisResult | None:
@@ -301,24 +401,30 @@ def _correlation(df, numeric) -> AnalysisResult | None:
         f"({strongest:+.2f}), which move {kind_word} together "
         f"(navy = positive, gold = negative)."
     )
-    return _result(title, fig, insight)
+    guide = (
+        "Each box shows how two columns move together, from -1 to +1. "
+        "Navy near +1: when one goes up, the other goes up too. Gold near "
+        "-1: one goes up while the other goes down. Near 0: no real link."
+    )
+    return _result(title, fig, insight, guide, priority=8)
 
 
-def auto_visualize(df: pd.DataFrame, max_charts: int = 8) -> list[AnalysisResult]:
+def auto_visualize(df: pd.DataFrame, max_charts: int = 10) -> list[AnalysisResult]:
     """Build a dashboard-style chart set + computed insights, LLM-free."""
     numeric, categorical, datetime_cols = _profile(df)
     val_col = _pick_value_column(numeric)
     results: list[AnalysisResult] = []
 
     if val_col and datetime_cols:
-        for builder in (_trend_over_time, _growth_by_period):
+        for builder in (_trend_over_time, _growth_by_period, _weekday_pattern):
             chart = builder(df, datetime_cols[0], val_col)
             if chart:
                 results.append(chart)
         if categorical:
-            comparison = _trend_by_category(df, datetime_cols[0], val_col, categorical[0])
-            if comparison:
-                results.append(comparison)
+            for builder in (_trend_by_category, _month_category_heatmap):
+                chart = builder(df, datetime_cols[0], val_col, categorical[0])
+                if chart:
+                    results.append(chart)
     if val_col:
         for cat_col in categorical[:3]:
             results.append(_bar_by_category(df, cat_col, val_col))
@@ -327,6 +433,7 @@ def auto_visualize(df: pd.DataFrame, max_charts: int = 8) -> list[AnalysisResult
         heatmap = _correlation(df, numeric)
         if heatmap:
             results.append(heatmap)
+    results.sort(key=lambda r: r.priority)
 
     if not results:
         return [AnalysisResult(
