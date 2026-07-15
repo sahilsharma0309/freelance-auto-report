@@ -49,7 +49,14 @@ body { font-family: Helvetica, Arial, sans-serif; color: #23272e; font-size: 10.
             border-radius: 50%%; background: %(primary)s; color: %(accent)s;
             font-weight: bold; font-size: 18pt; text-align: center; margin-right: 14px; }
 .brand { color: %(primary)s; font-size: 16pt; font-weight: bold; }
-.meta { color: #6a707a; font-size: 9pt; margin-bottom: 24px; }
+.meta { color: #6a707a; font-size: 9pt; margin-bottom: 16px; }
+.kpis { display: flex; gap: 10px; margin: 0 0 24px 0; }
+.kpi { flex: 1; border: 1px solid #e3e5e8; border-top: 3px solid %(accent)s;
+       padding: 8px 12px; }
+.kpi-label { font-size: 7.5pt; color: #6a707a; text-transform: uppercase;
+             letter-spacing: 0.06em; }
+.kpi-value { font-size: 15pt; color: %(primary)s; font-weight: bold; }
+.kpi-delta { font-size: 7.5pt; color: %(accent)s; }
 h1 { color: %(primary)s; font-size: 15pt; margin: 18px 0 4px 0; }
 .section { margin-bottom: 22px; page-break-inside: avoid; }
 .question { color: %(primary)s; font-size: 12pt; font-weight: bold;
@@ -105,7 +112,20 @@ def _section_html(result: AnalysisResult) -> str:
     return "".join(parts)
 
 
-def build_html(results: list[AnalysisResult], title: str, dataset_name: str) -> str:
+def _kpis_html(kpis) -> str:
+    if not kpis:
+        return ""
+    tiles = "".join(
+        f'<div class="kpi"><div class="kpi-label">{html.escape(k.label)}</div>'
+        f'<div class="kpi-value">{html.escape(k.value)}</div>'
+        f'<div class="kpi-delta">{html.escape(k.delta)}</div></div>'
+        for k in kpis
+    )
+    return f'<div class="kpis">{tiles}</div>'
+
+
+def build_html(results: list[AnalysisResult], title: str, dataset_name: str,
+               kpis=None) -> str:
     sections = "".join(_section_html(r) for r in results)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>{_CSS}</style></head>
@@ -113,9 +133,11 @@ def build_html(results: list[AnalysisResult], title: str, dataset_name: str) -> 
   <div class="header">{_logo_html()}<span class="brand">{html.escape(BRAND_NAME)}</span></div>
   <h1>{html.escape(title)}</h1>
   <p class="meta">Dataset: {html.escape(dataset_name)} &nbsp;·&nbsp; {date.today():%d %B %Y}</p>
+  {_kpis_html(kpis)}
   {sections}
 </body></html>"""
 
 
-def export_pdf(results: list[AnalysisResult], title: str, dataset_name: str) -> bytes:
-    return HTML(string=build_html(results, title, dataset_name)).write_pdf()
+def export_pdf(results: list[AnalysisResult], title: str, dataset_name: str,
+               kpis=None) -> bytes:
+    return HTML(string=build_html(results, title, dataset_name, kpis)).write_pdf()

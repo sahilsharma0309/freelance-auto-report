@@ -5,9 +5,12 @@ Run with:  streamlit run app.py
 
 from datetime import date
 
+import pandas as pd
 import streamlit as st
 
-from core.analysis import AnalysisResult, ask, configure_llm, load_dataframe
+from core.analysis import AnalysisResult, ask, configure_llm, load_dataframe, to_chat_frame
+from core.autoviz import _profile, auto_visualize
+from core.kpis import compute_kpis
 from core.report_docx import export_docx
 from core.settings import GROQ_API_KEY, LLM_MODEL, UPLOADS_DIR
 
@@ -58,6 +61,35 @@ if uploaded is not None:
         with st.expander("Preview data", expanded=False):
             st.dataframe(df.head(50), use_container_width=True)
 
+# ------------------------------------------------------- filters + KPIs
+fdf = None
+if df is not None:
+    fdf = pd.DataFrame(df).copy()
+    _, cat_cols, date_cols = _profile(fdf)
+
+    with st.sidebar:
+        st.header("Filters")
+        for col in date_cols[:1]:
+            dates = pd.to_datetime(fdf[col], errors="coerce", format="mixed")
+            d_min, d_max = dates.min().date(), dates.max().date()
+            picked = st.date_input(col, (d_min, d_max),
+                                   min_value=d_min, max_value=d_max)
+            if isinstance(picked, tuple) and len(picked) == 2:
+                mask = (dates.dt.date >= picked[0]) & (dates.dt.date <= picked[1])
+                fdf = fdf[mask]
+        for col in cat_cols[:2]:
+            options = sorted(str(v) for v in fdf[col].dropna().unique())
+            selected = st.multiselect(col, options, default=options)
+            if len(selected) != len(options):
+                fdf = fdf[fdf[col].astype(str).isin(selected)]
+        if len(fdf) != len(df):
+            st.caption(f"{len(fdf):,} of {len(df):,} rows after filters")
+
+    kpis = compute_kpis(fdf)
+    kpi_cols = st.columns(max(len(kpis), 1))
+    for slot, kpi in zip(kpi_cols, kpis):
+        slot.metric(kpi.label, kpi.value, kpi.delta or None)
+
 # ---------------------------------------------------------------- ask
 if df is not None:
     question = st.text_input(
@@ -75,21 +107,23 @@ if df is not None:
                     configure_llm()
                     st.session_state.llm_ready = True
                 with st.spinner("Thinking..."):
-                    result = ask(df, question.strip())
+                    result = ask(to_chat_frame(fdf), question.strip())
                 st.session_state.history.append(result)
     with col_auto:
         if st.button("📊 Auto-Visualize (no AI)", use_container_width=True,
-                     help="Instant branded charts + computed insights straight "
-                          "from the data — no LLM, no rate limits."):
-            from core.autoviz import auto_visualize
+                     help="Instant branded dashboard charts + computed insights "
+                          "straight from the data — no LLM, no rate limits. "
+                          "Respects the sidebar filters."):
             with st.spinner("Building charts..."):
-                st.session_state.history.extend(auto_visualize(df.head(100_000)))
+                st.session_state.history.extend(auto_visualize(fdf.head(100_000)))
 
 # ---------------------------------------------------------------- results
 def render(result: AnalysisResult) -> None:
     st.markdown(f"**Q: {result.question}**")
     if result.kind == "chart":
-        if result.chart_path:
+        if result.figure is not None:
+            st.plotly_chart(result.figure, use_container_width=True)
+        elif result.chart_path:
             st.image(result.chart_path)
         if result.text:
             st.markdown(f"💡 {result.text}")
@@ -124,7 +158,8 @@ if st.session_state.history:
             )
         else:
             try:
-                pdf_bytes = export_pdf(results, report_title, dataset_name)
+                pdf_bytes = export_pdf(results, report_title, dataset_name,
+                                       kpis=compute_kpis(fdf) if fdf is not None else None)
                 st.download_button(
                     "⬇️ Download PDF", pdf_bytes, file_name=f"{stem}.pdf",
                     mime="application/pdf", use_container_width=True,
@@ -133,7 +168,8 @@ if st.session_state.history:
                 st.error(f"PDF export failed: {exc}")
     with col_docx:
         try:
-            docx_bytes = export_docx(results, report_title, dataset_name)
+            docx_bytes = export_docx(results, report_title, dataset_name,
+                                     kpis=compute_kpis(fdf) if fdf is not None else None)
             st.download_button(
                 "⬇️ Download Word", docx_bytes, file_name=f"{stem}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
