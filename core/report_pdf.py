@@ -181,7 +181,8 @@ def _signature_html() -> str:
     image = ""
     if SIGNATURE_PATH.exists():
         encoded = base64.b64encode(SIGNATURE_PATH.read_bytes()).decode()
-        image = f'<img class="sign-img" src="data:image/png;base64,{encoded}"/>'
+        mime = "image/jpeg" if SIGNATURE_PATH.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+        image = f'<img class="sign-img" src="data:{mime};base64,{encoded}"/>'
     return (
         f'<div class="signature">{image}'
         f'<p class="sign-name">{html.escape(BRAND_NAME)}</p>'

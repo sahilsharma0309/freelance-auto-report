@@ -21,9 +21,15 @@ SERIES_PALETTE = ["#3D5C9E", "#A8862F", "#00969B"]
 # Drop your real logo at this path; reports fall back to a monogram until then.
 LOGO_PATH = PROJECT_ROOT / "assets" / "logo.png"
 
-# Drop your handwritten signature image here; it appears at the end of every
-# report. Until the file exists, reports show a typed sign-off block instead.
-SIGNATURE_PATH = PROJECT_ROOT / "assets" / "signature.png"
+# Handwritten signature image; appears at the end of every report. First
+# existing file wins; without one, reports show a typed sign-off block.
+_SIGNATURE_CANDIDATES = [
+    PROJECT_ROOT / "assets" / "signature.png",
+    PROJECT_ROOT / "assets" / "signature.jpg",
+]
+SIGNATURE_PATH = next(
+    (p for p in _SIGNATURE_CANDIDATES if p.exists()), _SIGNATURE_CANDIDATES[0]
+)
 
 # Text written inside the double-line page frame on PDF reports
 FRAME_TEXT = "SAHIL SHARMA  ·  DATA ANALYST"
