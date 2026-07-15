@@ -15,13 +15,49 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
 from core.analysis import AnalysisResult
+from docx.oxml import parse_xml
+
 from core.branding import (
     ACCENT_COLOR,
     BRAND_NAME,
     LOGO_PATH,
+    PAGE_WATERMARK_TEXT,
     PRIMARY_COLOR,
     WATERMARK_TEXT,
 )
+
+# Classic Word text watermark: a rotated VML shape anchored in the header,
+# centered on the page behind the body text.
+_WATERMARK_PICT = (
+    '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    '<w:pPr/><w:r><w:pict xmlns:v="urn:schemas-microsoft-com:vml" '
+    'xmlns:o="urn:schemas-microsoft-com:office:office">'
+    '<v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" '
+    'adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">'
+    '<v:formulas><v:f eqn="sum #0 0 10800"/><v:f eqn="prod #0 2 1"/>'
+    '<v:f eqn="sum 21600 0 @1"/><v:f eqn="sum 0 0 @2"/><v:f eqn="sum 21600 0 @3"/>'
+    '<v:f eqn="if @0 @3 0"/><v:f eqn="if @0 21600 @1"/><v:f eqn="if @0 0 @2"/>'
+    '<v:f eqn="if @0 @4 21600"/><v:f eqn="mid @5 @6"/><v:f eqn="mid @8 @5"/>'
+    '<v:f eqn="mid @7 @8"/><v:f eqn="mid @6 @7"/><v:f eqn="sum @6 0 @5"/></v:formulas>'
+    '<v:path textpathok="t" o:connecttype="custom" o:connectlocs="@9,0;@10,10800;@11,21600;@12,10800"/>'
+    '<v:textpath on="t" fitshape="t"/><o:lock v:ext="edit" text="t" shapetype="t"/>'
+    '</v:shapetype>'
+    '<v:shape id="BrandWatermark" type="#_x0000_t136" '
+    'style="position:absolute;margin-left:0;margin-top:0;width:480pt;height:120pt;'
+    'rotation:315;z-index:-251654144;mso-position-horizontal:center;'
+    'mso-position-horizontal-relative:margin;mso-position-vertical:center;'
+    'mso-position-vertical-relative:margin" '
+    f'o:allowincell="f" fillcolor="{PRIMARY_COLOR}" stroked="f">'
+    '<v:fill opacity="0.05"/>'
+    '<v:textpath style="font-family:&quot;Helvetica&quot;;font-size:1pt" '
+    f'string="{PAGE_WATERMARK_TEXT}"/>'
+    '</v:shape></w:pict></w:r></w:p>'
+)
+
+
+def _add_page_watermark(document: Document) -> None:
+    header = document.sections[0].header
+    header._element.append(parse_xml(_WATERMARK_PICT))
 
 MAX_TABLE_ROWS = 20
 
@@ -156,10 +192,11 @@ def _add_kpi_row(document: Document, kpis) -> None:
 
 
 def export_docx(results: list[AnalysisResult], title: str, dataset_name: str,
-                kpis=None) -> bytes:
+                kpis=None, client_name: str = "") -> bytes:
     document = Document()
     _build_header(document)
     _build_footer(document)
+    _add_page_watermark(document)
 
     heading = document.add_paragraph()
     h_run = heading.add_run(title)
@@ -167,7 +204,10 @@ def export_docx(results: list[AnalysisResult], title: str, dataset_name: str,
     h_run.font.size = Pt(16)
     h_run.font.color.rgb = PRIMARY_RGB
 
-    meta = document.add_paragraph(f"Dataset: {dataset_name}   ·   {date.today():%d %B %Y}")
+    client = f"   ·   Prepared for {client_name}" if client_name else ""
+    meta = document.add_paragraph(
+        f"Dataset: {dataset_name}   ·   {date.today():%d %B %Y}{client}"
+    )
     meta.runs[0].font.size = Pt(9)
     meta.runs[0].font.color.rgb = RGBColor(0x6A, 0x70, 0x7A)
     document.add_paragraph()

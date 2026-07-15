@@ -16,7 +16,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from core.analysis import AnalysisResult
-from core.branding import ACCENT_COLOR, PRIMARY_COLOR
+from core.branding import ACCENT_COLOR, PRIMARY_COLOR, SERIES_PALETTE
 from core.settings import CHARTS_DIR
 
 INK = "#23272e"
@@ -173,6 +173,58 @@ def _growth_by_period(df, date_col, val_col) -> AnalysisResult | None:
     return _result(title, fig, insight)
 
 
+def _trend_by_category(df, date_col, val_col, cat_col) -> AnalysisResult | None:
+    """Multi-series comparison: monthly value split across top categories."""
+    top = df.groupby(cat_col)[val_col].sum().nlargest(len(SERIES_PALETTE)).index.tolist()
+    dates = pd.to_datetime(df[date_col], errors="coerce", format="mixed")
+    frame = pd.DataFrame({
+        "d": dates, "v": df[val_col], "c": df[cat_col].astype(str),
+    }).dropna()
+    frame = frame[frame["c"].isin([str(t) for t in top])]
+    if frame.empty or (frame["d"].max() - frame["d"].min()).days <= 92:
+        return None
+    pivot = (
+        frame.set_index("d").groupby("c").resample("MS")["v"].sum()
+        .unstack(level=0).fillna(0)
+    )
+    if len(pivot) < 3:
+        return None
+    pivot = pivot[[str(t) for t in top if str(t) in pivot.columns]]
+
+    title = f"{val_col} by {cat_col} over time (top {len(pivot.columns)})"
+    fig = _base_figure(title)
+    for idx, col in enumerate(pivot.columns):
+        color = SERIES_PALETTE[idx]
+        fig.add_trace(go.Scatter(
+            x=pivot.index, y=pivot[col], mode="lines", name=col,
+            line=dict(color=color, width=2.5),
+            hovertemplate=f"{col} · %{{x|%b %Y}}: <b>%{{y:,.0f}}</b><extra></extra>",
+        ))
+        fig.add_annotation(  # direct label at the line's end
+            x=pivot.index[-1], y=pivot[col].iloc[-1], text=f" {col}",
+            showarrow=False, xanchor="left", font=dict(color=color, size=12),
+        )
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(orientation="h", y=1.08, x=0, font=dict(color=MUTED)),
+        margin=dict(l=70, r=110, t=90, b=60),
+    )
+
+    growth = {
+        col: (pivot[col].iloc[-1] - pivot[col].iloc[0]) / abs(pivot[col].iloc[0]) * 100
+        for col in pivot.columns if pivot[col].iloc[0]
+    }
+    insight = f"Comparing the top {len(pivot.columns)} {cat_col} groups by {val_col}."
+    if growth:
+        fastest = max(growth, key=growth.get)
+        insight += (
+            f" {fastest} grew fastest across the period ({growth[fastest]:+.1f}%), "
+            f"while {min(growth, key=growth.get)} moved "
+            f"{growth[min(growth, key=growth.get)]:+.1f}%."
+        )
+    return _result(title, fig, insight)
+
+
 def _bar_by_category(df, cat_col, val_col) -> AnalysisResult:
     totals = df.groupby(cat_col)[val_col].sum().sort_values(ascending=False)
     shown = totals.head(MAX_BARS).iloc[::-1]  # reversed for horizontal layout
@@ -252,7 +304,7 @@ def _correlation(df, numeric) -> AnalysisResult | None:
     return _result(title, fig, insight)
 
 
-def auto_visualize(df: pd.DataFrame, max_charts: int = 6) -> list[AnalysisResult]:
+def auto_visualize(df: pd.DataFrame, max_charts: int = 8) -> list[AnalysisResult]:
     """Build a dashboard-style chart set + computed insights, LLM-free."""
     numeric, categorical, datetime_cols = _profile(df)
     val_col = _pick_value_column(numeric)
@@ -263,6 +315,10 @@ def auto_visualize(df: pd.DataFrame, max_charts: int = 6) -> list[AnalysisResult
             chart = builder(df, datetime_cols[0], val_col)
             if chart:
                 results.append(chart)
+        if categorical:
+            comparison = _trend_by_category(df, datetime_cols[0], val_col, categorical[0])
+            if comparison:
+                results.append(comparison)
     if val_col:
         for cat_col in categorical[:3]:
             results.append(_bar_by_category(df, cat_col, val_col))

@@ -18,8 +18,19 @@ from core.branding import (
     BRAND_NAME,
     LOGO_PATH,
     MONOGRAM,
+    PAGE_WATERMARK_TEXT,
     PRIMARY_COLOR,
     WATERMARK_TEXT,
+)
+
+# Very light diagonal name across every page, drawn as the page background
+_WATERMARK_SVG = (
+    "data:image/svg+xml;utf8,"
+    "<svg xmlns='http://www.w3.org/2000/svg' width='700' height='700'>"
+    "<text x='350' y='350' font-size='58' font-family='Helvetica,Arial'"
+    f" fill='{PRIMARY_COLOR.replace('#', '%23')}' fill-opacity='0.05'"
+    " text-anchor='middle' transform='rotate(-35 350 350)'>"
+    f"{PAGE_WATERMARK_TEXT}</text></svg>"
 )
 
 MAX_TABLE_ROWS = 20
@@ -28,6 +39,7 @@ _CSS = """
 @page {
     size: A4;
     margin: 2cm 1.8cm 2.4cm 1.8cm;
+    background: url("%(watermark_svg)s") no-repeat center center;
     @bottom-center {
         content: "%(watermark)s";
         color: %(accent)s;
@@ -70,7 +82,12 @@ td { border-bottom: 1px solid #e3e5e8; padding: 4px 8px; }
 tr:nth-child(even) td { background: #f4f6f9; }
 .truncated { color: #8a8f98; font-size: 8pt; font-style: italic; }
 .error { color: #a33; }
-""" % {"primary": PRIMARY_COLOR, "accent": ACCENT_COLOR, "watermark": WATERMARK_TEXT}
+""" % {
+    "primary": PRIMARY_COLOR,
+    "accent": ACCENT_COLOR,
+    "watermark": WATERMARK_TEXT,
+    "watermark_svg": _WATERMARK_SVG,
+}
 
 
 def _logo_html() -> str:
@@ -125,19 +142,24 @@ def _kpis_html(kpis) -> str:
 
 
 def build_html(results: list[AnalysisResult], title: str, dataset_name: str,
-               kpis=None) -> str:
+               kpis=None, client_name: str = "") -> str:
     sections = "".join(_section_html(r) for r in results)
+    client = (
+        f" &nbsp;·&nbsp; Prepared for {html.escape(client_name)}" if client_name else ""
+    )
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>{_CSS}</style></head>
 <body>
   <div class="header">{_logo_html()}<span class="brand">{html.escape(BRAND_NAME)}</span></div>
   <h1>{html.escape(title)}</h1>
-  <p class="meta">Dataset: {html.escape(dataset_name)} &nbsp;·&nbsp; {date.today():%d %B %Y}</p>
+  <p class="meta">Dataset: {html.escape(dataset_name)} &nbsp;·&nbsp; {date.today():%d %B %Y}{client}</p>
   {_kpis_html(kpis)}
   {sections}
 </body></html>"""
 
 
 def export_pdf(results: list[AnalysisResult], title: str, dataset_name: str,
-               kpis=None) -> bytes:
-    return HTML(string=build_html(results, title, dataset_name, kpis)).write_pdf()
+               kpis=None, client_name: str = "") -> bytes:
+    return HTML(
+        string=build_html(results, title, dataset_name, kpis, client_name)
+    ).write_pdf()

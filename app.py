@@ -144,7 +144,11 @@ if st.session_state.history:
 
     # ------------------------------------------------------------ export
     st.subheader("Export Report")
-    report_title = st.text_input("Report title", value="Data Analysis Report")
+    col_title, col_client = st.columns(2)
+    with col_title:
+        report_title = st.text_input("Report title", value="Data Analysis Report")
+    with col_client:
+        client_name = st.text_input("Prepared for (client, optional)", value="")
     results = list(reversed(st.session_state.history))  # newest first, same as on screen
     stem = f"{report_title.strip().replace(' ', '_') or 'report'}_{date.today():%Y-%m-%d}"
 
@@ -159,7 +163,8 @@ if st.session_state.history:
         else:
             try:
                 pdf_bytes = export_pdf(results, report_title, dataset_name,
-                                       kpis=compute_kpis(fdf) if fdf is not None else None)
+                                       kpis=compute_kpis(fdf) if fdf is not None else None,
+                                       client_name=client_name.strip())
                 st.download_button(
                     "⬇️ Download PDF", pdf_bytes, file_name=f"{stem}.pdf",
                     mime="application/pdf", use_container_width=True,
@@ -169,7 +174,8 @@ if st.session_state.history:
     with col_docx:
         try:
             docx_bytes = export_docx(results, report_title, dataset_name,
-                                     kpis=compute_kpis(fdf) if fdf is not None else None)
+                                     kpis=compute_kpis(fdf) if fdf is not None else None,
+                                     client_name=client_name.strip())
             st.download_button(
                 "⬇️ Download Word", docx_bytes, file_name=f"{stem}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
