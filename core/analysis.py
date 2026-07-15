@@ -71,11 +71,15 @@ def _chat_with_retry(df: pai.DataFrame, prompt: str, attempts: int = 3):
             is_rate_limit = (
                 "RateLimitError" in type(exc).__name__ or "rate_limit" in message
             )
-            if not is_rate_limit or attempt == attempts - 1:
+            # "No code found" = the LLM answered without a code block; a
+            # simple re-ask usually fixes it.
+            is_flaky_output = "No code found" in message
+            if not (is_rate_limit or is_flaky_output) or attempt == attempts - 1:
                 raise
-            match = re.search(r"try again in ([\d.]+)s", message)
-            wait = float(match.group(1)) + 1 if match else 20
-            time.sleep(min(wait, 65))
+            if is_rate_limit:
+                match = re.search(r"try again in ([\d.]+)s", message)
+                wait = float(match.group(1)) + 1 if match else 20
+                time.sleep(min(wait, 65))
 
 
 def ask(df: pai.DataFrame, question: str) -> AnalysisResult:
