@@ -135,7 +135,28 @@ def _add_section(document: Document, result: AnalysisResult) -> None:
     document.add_paragraph()
 
 
-def export_docx(results: list[AnalysisResult], title: str, dataset_name: str) -> bytes:
+def _add_kpi_row(document: Document, kpis) -> None:
+    table = document.add_table(rows=1, cols=len(kpis))
+    table.style = "Table Grid"
+    for idx, kpi in enumerate(kpis):
+        cell = table.rows[0].cells[idx]
+        paragraph = cell.paragraphs[0]
+        label = paragraph.add_run(kpi.label.upper() + "\n")
+        label.font.size = Pt(7.5)
+        label.font.color.rgb = RGBColor(0x6A, 0x70, 0x7A)
+        value = paragraph.add_run(kpi.value)
+        value.font.bold = True
+        value.font.size = Pt(14)
+        value.font.color.rgb = PRIMARY_RGB
+        if kpi.delta:
+            delta = paragraph.add_run("\n" + kpi.delta)
+            delta.font.size = Pt(7.5)
+            delta.font.color.rgb = ACCENT_RGB
+    document.add_paragraph()
+
+
+def export_docx(results: list[AnalysisResult], title: str, dataset_name: str,
+                kpis=None) -> bytes:
     document = Document()
     _build_header(document)
     _build_footer(document)
@@ -150,6 +171,9 @@ def export_docx(results: list[AnalysisResult], title: str, dataset_name: str) ->
     meta.runs[0].font.size = Pt(9)
     meta.runs[0].font.color.rgb = RGBColor(0x6A, 0x70, 0x7A)
     document.add_paragraph()
+
+    if kpis:
+        _add_kpi_row(document, kpis)
 
     for result in results:
         _add_section(document, result)

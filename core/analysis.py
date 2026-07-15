@@ -25,6 +25,8 @@ class AnalysisResult:
     text: str = ""
     chart_path: str | None = None
     dataframe: pd.DataFrame | None = field(default=None, repr=False)
+    # Interactive plotly figure for in-app display; exports use chart_path
+    figure: object | None = field(default=None, repr=False)
 
 
 def configure_llm(api_key: str = "", model: str = "") -> None:
@@ -44,6 +46,11 @@ def configure_llm(api_key: str = "", model: str = "") -> None:
             "max_retries": 3,
         }
     )
+
+
+def to_chat_frame(df: pd.DataFrame) -> pai.DataFrame:
+    """Wrap a (possibly filtered) pandas frame for PandasAI chat."""
+    return df if isinstance(df, pai.DataFrame) else pai.DataFrame(df)
 
 
 def load_dataframe(path: str | Path) -> pai.DataFrame:
