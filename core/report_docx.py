@@ -161,6 +161,11 @@ def _add_section(document: Document, result: AnalysisResult) -> None:
         if result.text:
             insight = document.add_paragraph(result.text)
             insight.runs[0].font.size = Pt(10)
+        if result.guide:
+            note = document.add_paragraph(f"How to read: {result.guide}")
+            note.runs[0].font.size = Pt(8.5)
+            note.runs[0].font.italic = True
+            note.runs[0].font.color.rgb = RGBColor(0x6A, 0x70, 0x7A)
     elif result.kind == "dataframe" and result.dataframe is not None:
         _add_table(document, result.dataframe)
     elif result.kind == "error":

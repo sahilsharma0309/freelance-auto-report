@@ -27,6 +27,16 @@ class AnalysisResult:
     dataframe: pd.DataFrame | None = field(default=None, repr=False)
     # Interactive plotly figure for in-app display; exports use chart_path
     figure: object | None = field(default=None, repr=False)
+    # Plain-language "how to read this chart" line for non-technical readers
+    guide: str = ""
+    # Report ordering: lower comes first (autoviz charts 1-8, Q&A answers 9)
+    priority: int = 9
+
+
+def story_order(results: list["AnalysisResult"]) -> list["AnalysisResult"]:
+    """Order results the way a report should read: overview charts first
+    (trend, growth, comparisons, breakdowns...), Q&A answers at the end."""
+    return sorted(results, key=lambda r: r.priority)
 
 
 def configure_llm(api_key: str = "", model: str = "") -> None:

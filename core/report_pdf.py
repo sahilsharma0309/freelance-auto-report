@@ -101,6 +101,7 @@ h1 { color: %(primary)s; font-size: 15pt; margin: 18px 0 4px 0; }
 .chart { max-width: 100%%; margin: 6px 0; }
 .insight { background: #f6f4ee; border-left: 3px solid %(accent)s;
            padding: 8px 12px; font-size: 10pt; }
+.guide { color: #6a707a; font-size: 8.5pt; font-style: italic; margin: 4px 0 0 0; }
 table { border-collapse: collapse; width: 100%%; font-size: 9pt; margin: 6px 0; }
 th { background: %(primary)s; color: white; padding: 5px 8px; text-align: left; }
 td { border-bottom: 1px solid #e3e5e8; padding: 4px 8px; }
@@ -155,6 +156,10 @@ def _section_html(result: AnalysisResult) -> str:
             parts.append(_chart_html(result.chart_path))
         if result.text:
             parts.append(f'<p class="insight">{html.escape(result.text)}</p>')
+        if result.guide:
+            parts.append(
+                f'<p class="guide">How to read: {html.escape(result.guide)}</p>'
+            )
     elif result.kind == "dataframe" and result.dataframe is not None:
         parts.append(_table_html(result.dataframe))
     elif result.kind == "error":
