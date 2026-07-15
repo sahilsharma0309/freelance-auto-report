@@ -16,21 +16,42 @@ from core.analysis import AnalysisResult
 from core.branding import (
     ACCENT_COLOR,
     BRAND_NAME,
+    FRAME_TEXT,
     LOGO_PATH,
     MONOGRAM,
     PAGE_WATERMARK_TEXT,
     PRIMARY_COLOR,
+    SIGNATURE_PATH,
     WATERMARK_TEXT,
 )
 
-# Very light diagonal name across every page, drawn as the page background
-_WATERMARK_SVG = (
+# Page-frame background repeated on every page: a double black line on the
+# left/right/top with the brand name written in the gap between the two
+# lines, plus the light diagonal watermark. WeasyPrint positions the @page
+# background against the content area, so coordinates are in content-box
+# units (A4 minus our margins ~ 487x711 CSS px) and the body is padded to
+# keep content clear of the lines.
+_PRIMARY_ENC = PRIMARY_COLOR.replace("#", "%23")
+_PAGE_SVG = (
     "data:image/svg+xml;utf8,"
-    "<svg xmlns='http://www.w3.org/2000/svg' width='700' height='700'>"
-    "<text x='350' y='350' font-size='58' font-family='Helvetica,Arial'"
-    f" fill='{PRIMARY_COLOR.replace('#', '%23')}' fill-opacity='0.05'"
-    " text-anchor='middle' transform='rotate(-35 350 350)'>"
-    f"{PAGE_WATERMARK_TEXT}</text></svg>"
+    "<svg xmlns='http://www.w3.org/2000/svg' width='487' height='711'"
+    " viewBox='0 0 487 711'>"
+    # outer line: down-left, across-top, down-right
+    "<path d='M3,711 L3,4 L484,4 L484,711' fill='none'"
+    " stroke='%23111111' stroke-width='1.4'/>"
+    # inner line, leaving a gap that carries the name at the top
+    "<path d='M14,711 L14,23 L473,23 L473,711' fill='none'"
+    " stroke='%23111111' stroke-width='0.7'/>"
+    # name centered inside the top gap
+    "<text x='243' y='17.5' font-size='9.5' font-family='Helvetica,Arial'"
+    f" fill='{_PRIMARY_ENC}' text-anchor='middle' letter-spacing='3'>"
+    f"{FRAME_TEXT}</text>"
+    # light diagonal watermark
+    "<text x='243' y='370' font-size='40' font-family='Helvetica,Arial'"
+    f" fill='{_PRIMARY_ENC}' fill-opacity='0.05' text-anchor='middle'"
+    " transform='rotate(-35 243 370)'>"
+    f"{PAGE_WATERMARK_TEXT}</text>"
+    "</svg>"
 )
 
 MAX_TABLE_ROWS = 20
@@ -38,8 +59,11 @@ MAX_TABLE_ROWS = 20
 _CSS = """
 @page {
     size: A4;
-    margin: 2cm 1.8cm 2.4cm 1.8cm;
-    background: url("%(watermark_svg)s") no-repeat center center;
+    margin: 2.1cm 1.9cm 2.4cm 1.9cm;
+    /* clears the frame lines + name band on every page */
+    padding: 34px 26px 8px 26px;
+    background: url("%(page_svg)s") no-repeat center center;
+    background-size: 100%% 100%%;
     @bottom-center {
         content: "%(watermark)s";
         color: %(accent)s;
@@ -54,7 +78,8 @@ _CSS = """
     }
 }
 body { font-family: Helvetica, Arial, sans-serif; color: #23272e; font-size: 10.5pt; }
-.header { border-bottom: 3px solid %(accent)s; padding-bottom: 12px; margin-bottom: 6px;
+.header { border: 2px solid %(primary)s; border-bottom: 3px solid %(accent)s;
+          padding: 10px 14px; margin-bottom: 10px;
           display: flex; align-items: center; }
 .logo { height: 52px; margin-right: 14px; }
 .monogram { display: inline-block; width: 52px; height: 52px; line-height: 52px;
@@ -82,11 +107,22 @@ td { border-bottom: 1px solid #e3e5e8; padding: 4px 8px; }
 tr:nth-child(even) td { background: #f4f6f9; }
 .truncated { color: #8a8f98; font-size: 8pt; font-style: italic; }
 .error { color: #a33; }
+.summary { border: 1px solid #e3e5e8; border-left: 4px solid %(accent)s;
+           padding: 10px 14px; margin-bottom: 22px; }
+.summary-title { color: %(primary)s; font-weight: bold; font-size: 11pt;
+                 margin: 0 0 6px 0; }
+.summary ul { margin: 0; padding-left: 16px; }
+.summary li { font-size: 9.5pt; margin-bottom: 4px; }
+.signature { margin-top: 34px; text-align: right; page-break-inside: avoid; }
+.sign-img { display: block; margin-left: auto; height: 48px; margin-bottom: 2px; }
+.sign-name { display: inline-block; border-top: 1.2px solid #23272e;
+             padding-top: 5px; font-size: 9.5pt; color: #23272e; margin: 0; }
+.sign-date { font-size: 8pt; color: #8a8f98; margin: 2px 0 0 0; }
 """ % {
     "primary": PRIMARY_COLOR,
     "accent": ACCENT_COLOR,
     "watermark": WATERMARK_TEXT,
-    "watermark_svg": _WATERMARK_SVG,
+    "page_svg": _PAGE_SVG,
 }
 
 
@@ -129,6 +165,31 @@ def _section_html(result: AnalysisResult) -> str:
     return "".join(parts)
 
 
+def _summary_html(results: list[AnalysisResult]) -> str:
+    """Key-findings box built from the computed insights."""
+    insights = [r.text for r in results if r.kind == "chart" and r.text]
+    if len(insights) < 2:
+        return ""
+    items = "".join(f"<li>{html.escape(t)}</li>" for t in insights[:6])
+    return (
+        '<div class="summary"><p class="summary-title">Key Findings</p>'
+        f"<ul>{items}</ul></div>"
+    )
+
+
+def _signature_html() -> str:
+    image = ""
+    if SIGNATURE_PATH.exists():
+        encoded = base64.b64encode(SIGNATURE_PATH.read_bytes()).decode()
+        mime = "image/jpeg" if SIGNATURE_PATH.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+        image = f'<img class="sign-img" src="data:{mime};base64,{encoded}"/>'
+    return (
+        f'<div class="signature">{image}'
+        f'<p class="sign-name">{html.escape(BRAND_NAME)}</p>'
+        f'<p class="sign-date">{date.today():%d %B %Y}</p></div>'
+    )
+
+
 def _kpis_html(kpis) -> str:
     if not kpis:
         return ""
@@ -154,7 +215,9 @@ def build_html(results: list[AnalysisResult], title: str, dataset_name: str,
   <h1>{html.escape(title)}</h1>
   <p class="meta">Dataset: {html.escape(dataset_name)} &nbsp;·&nbsp; {date.today():%d %B %Y}{client}</p>
   {_kpis_html(kpis)}
+  {_summary_html(results)}
   {sections}
+  {_signature_html()}
 </body></html>"""
 
 
