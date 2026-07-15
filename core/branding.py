@@ -10,6 +10,14 @@ PRIMARY_COLOR = "#1A2B4C"  # navy blue
 ACCENT_COLOR = "#C9A94D"   # gold
 WATERMARK_TEXT = "Prepared by Sahil"
 
+# Very light diagonal watermark repeated on every report page
+PAGE_WATERMARK_TEXT = "Sahil Sharma"
+
+# Multi-series chart palette (fixed order, never cycled). Chart-tuned
+# variants of the brand hues - validated for colorblind separation and
+# contrast; the raw brand navy/gold are kept for single-series marks.
+SERIES_PALETTE = ["#3D5C9E", "#A8862F", "#00969B"]
+
 # Drop your real logo at this path; reports fall back to a monogram until then.
 LOGO_PATH = PROJECT_ROOT / "assets" / "logo.png"
 

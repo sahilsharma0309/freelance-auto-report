@@ -62,6 +62,24 @@ automatically; until then reports show a navy/gold monogram.
 Uploaded files and generated charts are written to `uploads/` and `exports/`,
 both git-ignored — client data never gets committed.
 
+## Scheduled weekly reports (email)
+
+`scripts/weekly_report.py` runs the whole pipeline headlessly — Auto-Visualize
+charts, KPI cards, branded PDF — and can email the result:
+
+```bash
+python scripts/weekly_report.py data/sales.csv --title "Weekly Sales Report" \
+    --client "Acme Corp" --to client@example.com
+```
+
+Set the `SMTP_*` values in `.env` first (for Gmail, use an App Password).
+Schedule it weekly:
+
+- **Windows** — Task Scheduler → Create Basic Task → weekly → Action:
+  `C:\...\venv\Scripts\python.exe C:\...\scripts\weekly_report.py C:\...\data.csv --to client@example.com`
+- **Linux/macOS** — `crontab -e` →
+  `0 9 * * 1 cd /path/to/repo && venv/bin/python scripts/weekly_report.py data.csv --to client@example.com`
+
 ## Roadmap
 
 - [x] Step 1 — project skeleton (`requirements.txt`, `.env.example`, `.gitignore`)
