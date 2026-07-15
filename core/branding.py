@@ -21,6 +21,13 @@ SERIES_PALETTE = ["#3D5C9E", "#A8862F", "#00969B"]
 # Drop your real logo at this path; reports fall back to a monogram until then.
 LOGO_PATH = PROJECT_ROOT / "assets" / "logo.png"
 
+# Drop your handwritten signature image here; it appears at the end of every
+# report. Until the file exists, reports show a typed sign-off block instead.
+SIGNATURE_PATH = PROJECT_ROOT / "assets" / "signature.png"
+
+# Text written inside the double-line page frame on PDF reports
+FRAME_TEXT = "SAHIL SHARMA  ·  DATA ANALYST"
+
 # Monogram shown in place of the logo while assets/logo.png doesn't exist
 MONOGRAM = "".join(
     word[0] for word in BRAND_NAME.split("—")[0].split() if word[0].isalpha()

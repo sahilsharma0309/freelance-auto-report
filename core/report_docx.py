@@ -23,6 +23,7 @@ from core.branding import (
     LOGO_PATH,
     PAGE_WATERMARK_TEXT,
     PRIMARY_COLOR,
+    SIGNATURE_PATH,
     WATERMARK_TEXT,
 )
 
@@ -171,6 +172,37 @@ def _add_section(document: Document, result: AnalysisResult) -> None:
     document.add_paragraph()
 
 
+def _add_summary(document: Document, results: list[AnalysisResult]) -> None:
+    insights = [r.text for r in results if r.kind == "chart" and r.text]
+    if len(insights) < 2:
+        return
+    heading = document.add_paragraph()
+    run = heading.add_run("Key Findings")
+    run.font.bold = True
+    run.font.size = Pt(12)
+    run.font.color.rgb = PRIMARY_RGB
+    for text in insights[:6]:
+        bullet = document.add_paragraph(text, style="List Bullet")
+        for run in bullet.runs:
+            run.font.size = Pt(9.5)
+    document.add_paragraph()
+
+
+def _add_signature(document: Document) -> None:
+    block = document.add_paragraph()
+    block.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    if SIGNATURE_PATH.exists():
+        block.add_run().add_picture(str(SIGNATURE_PATH), height=Inches(0.5))
+        block.add_run("\n")
+    name = block.add_run(BRAND_NAME)
+    name.font.size = Pt(9.5)
+    name.font.bold = True
+    name.font.color.rgb = PRIMARY_RGB
+    date_run = block.add_run(f"\n{date.today():%d %B %Y}")
+    date_run.font.size = Pt(8)
+    date_run.font.color.rgb = RGBColor(0x8A, 0x8F, 0x98)
+
+
 def _add_kpi_row(document: Document, kpis) -> None:
     table = document.add_table(rows=1, cols=len(kpis))
     table.style = "Table Grid"
@@ -214,9 +246,11 @@ def export_docx(results: list[AnalysisResult], title: str, dataset_name: str,
 
     if kpis:
         _add_kpi_row(document, kpis)
+    _add_summary(document, results)
 
     for result in results:
         _add_section(document, result)
+    _add_signature(document)
 
     buffer = io.BytesIO()
     document.save(buffer)
