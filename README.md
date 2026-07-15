@@ -35,6 +35,10 @@ cp .env.example .env
 >
 > On **Streamlit Community Cloud** no manual step is needed — `packages.txt`
 > at the repo root is installed automatically, so PDF export just works.
+> `runtime.txt` / `.python-version` pin Python 3.11 there; if the build
+> still uses a newer Python, delete the app and redeploy choosing
+> **Python 3.11** under Advanced settings (the version can't be changed
+> on an existing app).
 
 ## Run
 
