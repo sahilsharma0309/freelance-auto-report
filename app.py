@@ -3,6 +3,7 @@
 Run with:  streamlit run app.py
 """
 
+import re
 from datetime import date
 
 import pandas as pd
@@ -12,14 +13,17 @@ from core.analysis import (
     AnalysisResult,
     ask,
     configure_llm,
-    load_dataframe,
     story_order,
     to_chat_frame,
 )
 from core.autoviz import _profile, auto_visualize
+from core.branding import ACCENT_COLOR, BRAND_NAME, MONOGRAM, PRIMARY_COLOR
 from core.kpis import compute_kpis
 from core.report_docx import export_docx
 from core.settings import GROQ_API_KEY, LLM_MODEL, UPLOADS_DIR
+
+MAX_FILES = 5
+COMBINE_LABEL = "🔗 All files combined"
 
 # WeasyPrint needs system libraries (GTK3 on Windows, pango/cairo on Linux).
 # If they're missing, keep the app usable and only disable PDF export.
@@ -28,12 +32,38 @@ try:
 except OSError:
     export_pdf = None
 
-st.set_page_config(page_title="Freelance Auto-Report", page_icon="📊", layout="wide")
+st.set_page_config(page_title=BRAND_NAME, page_icon="📊", layout="wide")
 
-st.title("📊 Freelance Auto-Report")
-st.caption(
-    "Upload a CSV/Excel file → get an instant dashboard → export a branded, "
-    "signed PDF/Word report."
+# ------------------------------------------------- SaaS look & feel
+st.markdown(
+    f"""<style>
+    #MainMenu, footer {{visibility: hidden;}}
+    div[data-testid="stMetric"] {{
+        background: #ffffff; border: 1px solid #e3e5e8;
+        border-top: 3px solid {ACCENT_COLOR};
+        padding: 14px 18px; border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(26,43,76,0.06);
+    }}
+    div[data-testid="stMetric"] label {{ color: #6a707a; }}
+    .stTabs [data-baseweb="tab"] {{ font-weight: 600; }}
+    div[data-testid="stFileUploader"] section {{ border-radius: 8px; }}
+    </style>""",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    f"""<div style="display:flex;align-items:center;gap:14px;padding:6px 0 14px 0;
+         border-bottom:3px solid {ACCENT_COLOR};margin-bottom:16px">
+      <div style="width:46px;height:46px;border-radius:50%;background:{PRIMARY_COLOR};
+           color:{ACCENT_COLOR};display:flex;align-items:center;justify-content:center;
+           font-weight:700;font-size:20px">{MONOGRAM}</div>
+      <div>
+        <div style="font-size:25px;font-weight:700;color:{PRIMARY_COLOR};line-height:1.15">
+          {BRAND_NAME}</div>
+        <div style="color:#6a707a;font-size:14px">
+          Upload data → instant dashboard → branded client report</div>
+      </div>
+    </div>""",
+    unsafe_allow_html=True,
 )
 
 # ---------------------------------------------------------------- sidebar
@@ -55,19 +85,52 @@ if "llm_ready" not in st.session_state:
     st.session_state.llm_ready = False
 
 # ---------------------------------------------------------------- upload
-uploaded = st.file_uploader("Upload your data file", type=["csv", "xlsx", "xls"])
+uploads = st.file_uploader(
+    f"Upload your data files (up to {MAX_FILES} — CSV or Excel)",
+    type=["csv", "xlsx", "xls"], accept_multiple_files=True,
+)
+if uploads and len(uploads) > MAX_FILES:
+    st.warning(f"Using the first {MAX_FILES} files only.")
+    uploads = uploads[:MAX_FILES]
 
-df = None
-dataset_name = uploaded.name if uploaded is not None else "dataset"
-if uploaded is not None:
+
+def _read_upload(uploaded) -> pd.DataFrame | None:
     saved_path = UPLOADS_DIR / uploaded.name
     saved_path.write_bytes(uploaded.getbuffer())
     try:
-        df = load_dataframe(saved_path)
+        if saved_path.suffix.lower() == ".csv":
+            return pd.read_csv(saved_path)
+        return pd.read_excel(saved_path)
     except Exception as exc:
-        st.error(f"Could not read file: {exc}")
-    else:
-        st.success(f"Loaded **{uploaded.name}** — {len(df)} rows × {len(df.columns)} columns")
+        st.error(f"Could not read {uploaded.name}: {exc}")
+        return None
+
+
+df = None
+dataset_name = "dataset"
+if uploads:
+    frames = {u.name: frame for u in uploads
+              if (frame := _read_upload(u)) is not None}
+    if frames:
+        options = list(frames)
+        same_columns = len(frames) > 1 and len(
+            {tuple(sorted(f.columns)) for f in frames.values()}
+        ) == 1
+        if same_columns:
+            options = [COMBINE_LABEL] + options
+        choice = options[0] if len(options) == 1 else st.selectbox(
+            "Which dataset do you want to analyze?", options,
+        )
+        if choice == COMBINE_LABEL:
+            df = pd.concat(frames.values(), ignore_index=True)
+            dataset_name = f"{len(frames)} files combined"
+        else:
+            df = frames[choice]
+            dataset_name = choice
+        st.success(f"Loaded **{dataset_name}** — {len(df):,} rows × {len(df.columns)} columns")
+        if len(frames) > 1 and not same_columns:
+            st.caption("Files have different columns, so they can't be combined — "
+                       "pick one at a time from the dropdown.")
         with st.expander("Preview data", expanded=False):
             st.dataframe(df.head(50), use_container_width=True)
 
@@ -89,8 +152,11 @@ if df is not None:
                 fdf = fdf[mask]
         for col in cat_cols[:2]:
             options = sorted(str(v) for v in fdf[col].dropna().unique())
-            selected = st.multiselect(col, options, default=options)
-            if len(selected) != len(options):
+            selected = st.multiselect(
+                col, options, default=[],
+                placeholder=f"All {col} (pick to filter)",
+            )
+            if selected:
                 fdf = fdf[fdf[col].astype(str).isin(selected)]
         if len(fdf) != len(df):
             st.caption(f"{len(fdf):,} of {len(df):,} rows after filters")
@@ -200,7 +266,11 @@ if df is not None:
                 "a plain-language 'How to read' line — made for non-technical clients."
             )
             results = story_order(st.session_state.history)
-            stem = f"{report_title.strip().replace(' ', '_') or 'report'}_{date.today():%Y-%m-%d}"
+            parts = [report_title.strip() or "report"]
+            if client_name.strip():
+                parts.append(client_name.strip())
+            parts.append(f"{date.today():%Y-%m-%d}")
+            stem = "_".join(re.sub(r"[^A-Za-z0-9-]+", "_", p).strip("_") for p in parts)
 
             col_pdf, col_docx = st.columns(2)
             with col_pdf:
