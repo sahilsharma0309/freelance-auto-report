@@ -13,6 +13,7 @@ import pandas as pd
 from weasyprint import HTML
 
 from core.analysis import AnalysisResult
+from core.i18n import t
 from core.branding import (
     ACCENT_COLOR,
     BRAND_NAME,
@@ -77,7 +78,11 @@ _CSS = """
         font-size: 8pt;
     }
 }
-body { font-family: Helvetica, Arial, sans-serif; color: #23272e; font-size: 10.5pt; }
+body { font-family: Helvetica, Arial, 'Noto Sans Devanagari', 'Noto Sans', sans-serif;
+       color: #23272e; font-size: 10.5pt; }
+.client-line { font-size: 11.5pt; color: %(primary)s; font-weight: bold;
+               margin: 0 0 14px 0; }
+.client-line span { border-bottom: 2px solid %(accent)s; padding-bottom: 2px; }
 .header { border: 2px solid %(primary)s; border-bottom: 3px solid %(accent)s;
           padding: 10px 14px; margin-bottom: 10px;
           display: flex; align-items: center; }
@@ -140,16 +145,17 @@ def _chart_html(path: str) -> str:
     return f'<img class="chart" src="data:image/png;base64,{encoded}"/>'
 
 
-def _table_html(df: pd.DataFrame) -> str:
+def _table_html(df: pd.DataFrame, lang: str = "en") -> str:
     shown = df.head(MAX_TABLE_ROWS)
     table = shown.to_html(index=False, border=0, escape=True)
     note = ""
     if len(df) > MAX_TABLE_ROWS:
-        note = f'<p class="truncated">Showing first {MAX_TABLE_ROWS} of {len(df)} rows.</p>'
+        text = t("showing_first", lang).format(shown=MAX_TABLE_ROWS, total=len(df))
+        note = f'<p class="truncated">{text}</p>'
     return table + note
 
 
-def _section_html(result: AnalysisResult) -> str:
+def _section_html(result: AnalysisResult, lang: str = "en") -> str:
     parts = [f'<div class="section"><p class="question">{html.escape(result.question)}</p>']
     if result.kind == "chart":
         if result.chart_path:
@@ -158,10 +164,10 @@ def _section_html(result: AnalysisResult) -> str:
             parts.append(f'<p class="insight">{html.escape(result.text)}</p>')
         if result.guide:
             parts.append(
-                f'<p class="guide">How to read: {html.escape(result.guide)}</p>'
+                f'<p class="guide">{t("how_to_read", lang)}: {html.escape(result.guide)}</p>'
             )
     elif result.kind == "dataframe" and result.dataframe is not None:
-        parts.append(_table_html(result.dataframe))
+        parts.append(_table_html(result.dataframe, lang))
     elif result.kind == "error":
         parts.append(f'<p class="error">{html.escape(result.text)}</p>')
     else:
@@ -170,14 +176,14 @@ def _section_html(result: AnalysisResult) -> str:
     return "".join(parts)
 
 
-def _summary_html(results: list[AnalysisResult]) -> str:
+def _summary_html(results: list[AnalysisResult], lang: str = "en") -> str:
     """Key-findings box built from the computed insights."""
     insights = [r.text for r in results if r.kind == "chart" and r.text]
     if len(insights) < 2:
         return ""
     items = "".join(f"<li>{html.escape(t)}</li>" for t in insights[:6])
     return (
-        '<div class="summary"><p class="summary-title">Key Findings</p>'
+        f'<div class="summary"><p class="summary-title">{t("key_findings", lang)}</p>'
         f"<ul>{items}</ul></div>"
     )
 
@@ -208,26 +214,30 @@ def _kpis_html(kpis) -> str:
 
 
 def build_html(results: list[AnalysisResult], title: str, dataset_name: str,
-               kpis=None, client_name: str = "") -> str:
-    sections = "".join(_section_html(r) for r in results)
-    client = (
-        f" &nbsp;·&nbsp; Prepared for {html.escape(client_name)}" if client_name else ""
-    )
+               kpis=None, client_name: str = "", lang: str = "en") -> str:
+    sections = "".join(_section_html(r, lang) for r in results)
+    client = ""
+    if client_name:
+        client = (
+            f'<p class="client-line">{t("prepared_for", lang)}: '
+            f"<span>{html.escape(client_name)}</span></p>"
+        )
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>{_CSS}</style></head>
 <body>
   <div class="header">{_logo_html()}<span class="brand">{html.escape(BRAND_NAME)}</span></div>
   <h1>{html.escape(title)}</h1>
-  <p class="meta">Dataset: {html.escape(dataset_name)} &nbsp;·&nbsp; {date.today():%d %B %Y}{client}</p>
+  <p class="meta">{t("dataset", lang)}: {html.escape(dataset_name)} &nbsp;·&nbsp; {date.today():%d %B %Y}</p>
+  {client}
   {_kpis_html(kpis)}
-  {_summary_html(results)}
+  {_summary_html(results, lang)}
   {sections}
   {_signature_html()}
 </body></html>"""
 
 
 def export_pdf(results: list[AnalysisResult], title: str, dataset_name: str,
-               kpis=None, client_name: str = "") -> bytes:
+               kpis=None, client_name: str = "", lang: str = "en") -> bytes:
     return HTML(
-        string=build_html(results, title, dataset_name, kpis, client_name)
+        string=build_html(results, title, dataset_name, kpis, client_name, lang)
     ).write_pdf()

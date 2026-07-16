@@ -6,3 +6,4 @@ libharfbuzz-subset0
 libfontconfig1
 shared-mime-info
 fonts-liberation
+fonts-noto-core

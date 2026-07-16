@@ -5,24 +5,25 @@ from dataclasses import dataclass
 import pandas as pd
 
 from core.autoviz import _fmt, _pick_value_column, _profile
+from core.i18n import t
 
 
 @dataclass
 class Kpi:
     label: str
     value: str
-    delta: str = ""  # e.g. "+12.4% vs previous period"
+    delta: str = ""  # e.g. "+12.4% vs Nov"
 
 
-def compute_kpis(df: pd.DataFrame) -> list[Kpi]:
+def compute_kpis(df: pd.DataFrame, lang: str = "en") -> list[Kpi]:
     numeric, categorical, datetime_cols = _profile(df)
     val_col = _pick_value_column(numeric)
-    kpis: list[Kpi] = [Kpi("Records", f"{len(df):,}")]
+    kpis: list[Kpi] = [Kpi(t("kpi_records", lang), f"{len(df):,}")]
 
     if val_col:
         values = df[val_col].dropna()
-        kpis.append(Kpi(f"Total {val_col}", _fmt(values.sum())))
-        kpis.append(Kpi(f"Avg {val_col}", _fmt(values.mean())))
+        kpis.append(Kpi(t("kpi_total", lang).format(col=val_col), _fmt(values.sum())))
+        kpis.append(Kpi(t("kpi_avg", lang).format(col=val_col), _fmt(values.mean())))
 
     if val_col and datetime_cols:
         dates = pd.to_datetime(df[datetime_cols[0]], errors="coerce", format="mixed")
@@ -39,12 +40,15 @@ def compute_kpis(df: pd.DataFrame) -> list[Kpi]:
             if prev:
                 change = (last - prev) / abs(prev) * 100
                 kpis.append(Kpi(
-                    f"{monthly.index[-1]:%b %Y} {val_col}",
+                    t("kpi_latest", lang).format(
+                        month=f"{monthly.index[-1]:%b %Y}", col=val_col),
                     _fmt(last),
-                    f"{change:+.1f}% vs {monthly.index[-2]:%b}",
+                    t("kpi_delta", lang).format(
+                        change=f"{change:+.1f}%", month=f"{monthly.index[-2]:%b}"),
                 ))
     elif categorical:
         top_col = categorical[0]
-        kpis.append(Kpi(f"Distinct {top_col}", f"{df[top_col].nunique():,}"))
+        kpis.append(Kpi(
+            t("kpi_distinct", lang).format(col=top_col), f"{df[top_col].nunique():,}"))
 
     return kpis[:4]
