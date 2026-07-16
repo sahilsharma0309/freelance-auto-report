@@ -18,6 +18,7 @@ from core.analysis import (
 )
 from core.autoviz import _profile, auto_visualize
 from core.branding import ACCENT_COLOR, BRAND_NAME, MONOGRAM, PRIMARY_COLOR
+from core.i18n import LANGUAGES
 from core.kpis import compute_kpis
 from core.report_docx import export_docx
 from core.settings import GROQ_API_KEY, LLM_MODEL, UPLOADS_DIR
@@ -69,6 +70,13 @@ st.markdown(
 # ---------------------------------------------------------------- sidebar
 with st.sidebar:
     st.header("Settings")
+    lang_label = st.radio(
+        "Report language / रिपोर्ट की भाषा",
+        list(LANGUAGES), horizontal=True,
+        help="Charts, insights, reading guides, and the exported report "
+             "are written in this language.",
+    )
+    lang = LANGUAGES[lang_label]
     if GROQ_API_KEY:
         st.success("Groq API key loaded from .env")
     else:
@@ -161,7 +169,7 @@ if df is not None:
         if len(fdf) != len(df):
             st.caption(f"{len(fdf):,} of {len(df):,} rows after filters")
 
-    kpis = compute_kpis(fdf)
+    kpis = compute_kpis(fdf, lang)
     kpi_cols = st.columns(max(len(kpis), 1))
     for slot, kpi in zip(kpi_cols, kpis):
         slot.metric(kpi.label, kpi.value, kpi.delta or None)
@@ -190,8 +198,8 @@ def render(result: AnalysisResult) -> None:
 
 # ---------------------------------------------------------------- tabs
 if df is not None:
-    tab_dash, tab_ask, tab_export = st.tabs(
-        ["📊 Dashboard", "🤖 Ask AI", "📄 Export Report"]
+    tab_dash, tab_ask, tab_3d, tab_export = st.tabs(
+        ["📊 Dashboard", "🤖 Ask AI", "🧊 3D & Animation", "📄 Export Report"]
     )
 
     with tab_dash:
@@ -205,7 +213,7 @@ if df is not None:
                 with st.spinner("Building charts..."):
                     st.session_state.history = [
                         r for r in st.session_state.history if r.priority >= 9
-                    ] + auto_visualize(fdf.head(100_000))
+                    ] + auto_visualize(fdf.head(100_000), lang=lang)
         with right:
             with st.expander("📖 New to charts? Read this first (simple guide)"):
                 st.markdown(
@@ -244,11 +252,33 @@ if df is not None:
                     configure_llm()
                     st.session_state.llm_ready = True
                 with st.spinner("Thinking..."):
-                    result = ask(to_chat_frame(fdf), question.strip())
+                    result = ask(to_chat_frame(fdf), question.strip(), lang=lang)
                 st.session_state.history.append(result)
         qa_results = [r for r in st.session_state.history if r.priority >= 9]
         for item in reversed(qa_results):
             render(item)
+
+    with tab_3d:
+        st.caption(
+            "Interactive showpieces — **drag / swipe to rotate** the 3D charts, "
+            "press **▶ Play** on the race. These live in the app only; the "
+            "printable report keeps the standard charts (they stay readable on paper)."
+        )
+        if st.button("🧊 Build 3D & animated visuals", type="primary",
+                     use_container_width=False):
+            from core.viz3d import studio_3d
+            with st.spinner("Building 3D scene..."):
+                results_3d, notes_3d = studio_3d(fdf.head(100_000), lang=lang)
+            st.session_state.studio3d = results_3d
+            st.session_state.studio3d_notes = notes_3d
+        for note in st.session_state.get("studio3d_notes", []):
+            st.info(note)
+        for item in st.session_state.get("studio3d", []):
+            st.markdown(f"**{item.question}**")
+            st.plotly_chart(item.figure, use_container_width=True)
+            if item.guide:
+                st.caption(f"📖 {item.guide}")
+            st.divider()
 
     with tab_export:
         if not st.session_state.history:
@@ -265,41 +295,64 @@ if df is not None:
                 "story order (trend → growth → comparisons → rankings), each with "
                 "a plain-language 'How to read' line — made for non-technical clients."
             )
-            results = story_order(st.session_state.history)
-            parts = [report_title.strip() or "report"]
-            if client_name.strip():
-                parts.append(client_name.strip())
-            parts.append(f"{date.today():%Y-%m-%d}")
-            stem = "_".join(re.sub(r"[^A-Za-z0-9-]+", "_", p).strip("_") for p in parts)
-
-            col_pdf, col_docx = st.columns(2)
-            with col_pdf:
-                if export_pdf is None:
-                    st.warning(
-                        "PDF export needs the GTK3 runtime on Windows. Install it from "
-                        "[gtk3-runtime releases](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases) "
-                        "and restart the app. Word export works without it."
-                    )
-                else:
+            # Two-step export: an explicit Generate click reads the final
+            # title/client values, so a name typed just before downloading
+            # is never lost to Streamlit's stale-rerun behavior.
+            if st.button("🧾 Generate report files", type="primary",
+                         use_container_width=True):
+                results = story_order(st.session_state.history)
+                report_kpis = compute_kpis(fdf, lang) if fdf is not None else None
+                parts = [report_title.strip() or "report"]
+                if client_name.strip():
+                    parts.append(client_name.strip())
+                parts.append(f"{date.today():%Y-%m-%d}")
+                stem = "_".join(
+                    re.sub(r"[^A-Za-z0-9-]+", "_", p).strip("_") for p in parts
+                )
+                report_files = {"stem": stem}
+                with st.spinner("Building your report..."):
+                    if export_pdf is not None:
+                        try:
+                            report_files["pdf"] = export_pdf(
+                                results, report_title, dataset_name,
+                                kpis=report_kpis, client_name=client_name.strip(),
+                                lang=lang,
+                            )
+                        except Exception as exc:
+                            st.error(f"PDF export failed: {exc}")
                     try:
-                        pdf_bytes = export_pdf(results, report_title, dataset_name,
-                                               kpis=compute_kpis(fdf) if fdf is not None else None,
-                                               client_name=client_name.strip())
-                        st.download_button(
-                            "⬇️ Download PDF", pdf_bytes, file_name=f"{stem}.pdf",
-                            mime="application/pdf", use_container_width=True,
+                        report_files["docx"] = export_docx(
+                            results, report_title, dataset_name,
+                            kpis=report_kpis, client_name=client_name.strip(),
+                            lang=lang,
                         )
                     except Exception as exc:
-                        st.error(f"PDF export failed: {exc}")
-            with col_docx:
-                try:
-                    docx_bytes = export_docx(results, report_title, dataset_name,
-                                             kpis=compute_kpis(fdf) if fdf is not None else None,
-                                             client_name=client_name.strip())
-                    st.download_button(
-                        "⬇️ Download Word", docx_bytes, file_name=f"{stem}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True,
-                    )
-                except Exception as exc:
-                    st.error(f"Word export failed: {exc}")
+                        st.error(f"Word export failed: {exc}")
+                st.session_state.report_files = report_files
+
+            files = st.session_state.get("report_files")
+            if files:
+                col_pdf, col_docx = st.columns(2)
+                with col_pdf:
+                    if export_pdf is None:
+                        st.warning(
+                            "PDF export needs the GTK3 runtime on Windows. Install it from "
+                            "[gtk3-runtime releases](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases) "
+                            "and restart the app. Word export works without it."
+                        )
+                    elif "pdf" in files:
+                        st.download_button(
+                            "⬇️ Download PDF", files["pdf"],
+                            file_name=f"{files['stem']}.pdf",
+                            mime="application/pdf", use_container_width=True,
+                        )
+                with col_docx:
+                    if "docx" in files:
+                        st.download_button(
+                            "⬇️ Download Word", files["docx"],
+                            file_name=f"{files['stem']}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                        )
+                st.caption("Changed the title, client, language, or charts? "
+                           "Click **Generate report files** again to refresh the downloads.")

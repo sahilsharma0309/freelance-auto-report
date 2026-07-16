@@ -106,12 +106,14 @@ def _chat_with_retry(df: pai.DataFrame, prompt: str, attempts: int = 4):
                 time.sleep(min(wait, 65))
 
 
-def ask(df: pai.DataFrame, question: str) -> AnalysisResult:
+def ask(df: pai.DataFrame, question: str, lang: str = "en") -> AnalysisResult:
     """Run one natural-language question and normalize the response.
 
     When the answer is a chart, a short follow-up question is asked so every
     chart also carries a written insight for the report.
     """
+    if lang == "hi":
+        question = f"{question}\n(जवाब हिंदी में देना।)"
     try:
         response = _chat_with_retry(df, question)
     except Exception as exc:  # pandasai raises many provider-specific errors
@@ -129,7 +131,7 @@ def ask(df: pai.DataFrame, question: str) -> AnalysisResult:
             question=question,
             kind="chart",
             chart_path=str(chart_path),
-            text=_written_insight(df, question),
+            text=_written_insight(df, question, lang),
         )
 
     if rtype == "dataframe":
@@ -140,12 +142,14 @@ def ask(df: pai.DataFrame, question: str) -> AnalysisResult:
     return AnalysisResult(question=question, kind="text", text=str(response.value))
 
 
-def _written_insight(df: pai.DataFrame, question: str) -> str:
+def _written_insight(df: pai.DataFrame, question: str, lang: str = "en") -> str:
     """Ask for a plain-text takeaway to pair with a chart."""
     prompt = (
         "Answer in plain text only, no chart or code: in 2-4 sentences, "
         f"summarize the key insight from the data for this question: {question}"
     )
+    if lang == "hi":
+        prompt += " Reply in Hindi (Devanagari script)."
     try:
         follow_up = _chat_with_retry(df, prompt)
         if getattr(follow_up, "type", "") in ("string", "number"):

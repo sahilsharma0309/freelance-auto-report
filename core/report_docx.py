@@ -15,6 +15,7 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
 from core.analysis import AnalysisResult
+from core.i18n import t
 from docx.oxml import parse_xml
 
 from core.branding import (
@@ -124,7 +125,7 @@ def _build_footer(document: Document) -> None:
     _add_page_number(paragraph)
 
 
-def _add_table(document: Document, df: pd.DataFrame) -> None:
+def _add_table(document: Document, df: pd.DataFrame, lang: str = "en") -> None:
     shown = df.head(MAX_TABLE_ROWS)
     table = document.add_table(rows=1, cols=len(shown.columns))
     table.style = "Table Grid"
@@ -143,12 +144,12 @@ def _add_table(document: Document, df: pd.DataFrame) -> None:
             for run in cells[idx].paragraphs[0].runs:
                 run.font.size = Pt(9)
     if len(df) > MAX_TABLE_ROWS:
-        note = document.add_paragraph(f"Showing first {MAX_TABLE_ROWS} of {len(df)} rows.")
+        note = document.add_paragraph(t("showing_first", lang).format(shown=MAX_TABLE_ROWS, total=len(df)))
         note.runs[0].font.italic = True
         note.runs[0].font.size = Pt(8)
 
 
-def _add_section(document: Document, result: AnalysisResult) -> None:
+def _add_section(document: Document, result: AnalysisResult, lang: str = "en") -> None:
     question = document.add_paragraph()
     q_run = question.add_run(result.question)
     q_run.font.bold = True
@@ -162,12 +163,12 @@ def _add_section(document: Document, result: AnalysisResult) -> None:
             insight = document.add_paragraph(result.text)
             insight.runs[0].font.size = Pt(10)
         if result.guide:
-            note = document.add_paragraph(f"How to read: {result.guide}")
+            note = document.add_paragraph(f"{t('how_to_read', lang)}: {result.guide}")
             note.runs[0].font.size = Pt(8.5)
             note.runs[0].font.italic = True
             note.runs[0].font.color.rgb = RGBColor(0x6A, 0x70, 0x7A)
     elif result.kind == "dataframe" and result.dataframe is not None:
-        _add_table(document, result.dataframe)
+        _add_table(document, result.dataframe, lang)
     elif result.kind == "error":
         error = document.add_paragraph(result.text)
         error.runs[0].font.color.rgb = RGBColor(0xAA, 0x33, 0x33)
@@ -177,12 +178,12 @@ def _add_section(document: Document, result: AnalysisResult) -> None:
     document.add_paragraph()
 
 
-def _add_summary(document: Document, results: list[AnalysisResult]) -> None:
+def _add_summary(document: Document, results: list[AnalysisResult], lang: str = "en") -> None:
     insights = [r.text for r in results if r.kind == "chart" and r.text]
     if len(insights) < 2:
         return
     heading = document.add_paragraph()
-    run = heading.add_run("Key Findings")
+    run = heading.add_run(t("key_findings", lang))
     run.font.bold = True
     run.font.size = Pt(12)
     run.font.color.rgb = PRIMARY_RGB
@@ -229,7 +230,7 @@ def _add_kpi_row(document: Document, kpis) -> None:
 
 
 def export_docx(results: list[AnalysisResult], title: str, dataset_name: str,
-                kpis=None, client_name: str = "") -> bytes:
+                kpis=None, client_name: str = "", lang: str = "en") -> bytes:
     document = Document()
     _build_header(document)
     _build_footer(document)
@@ -241,20 +242,26 @@ def export_docx(results: list[AnalysisResult], title: str, dataset_name: str,
     h_run.font.size = Pt(16)
     h_run.font.color.rgb = PRIMARY_RGB
 
-    client = f"   ·   Prepared for {client_name}" if client_name else ""
     meta = document.add_paragraph(
-        f"Dataset: {dataset_name}   ·   {date.today():%d %B %Y}{client}"
+        f"{t('dataset', lang)}: {dataset_name}   ·   {date.today():%d %B %Y}"
     )
     meta.runs[0].font.size = Pt(9)
     meta.runs[0].font.color.rgb = RGBColor(0x6A, 0x70, 0x7A)
     document.add_paragraph()
 
+    if client_name:
+        client_p = document.add_paragraph()
+        client_run = client_p.add_run(f"{t('prepared_for', lang)}: {client_name}")
+        client_run.font.bold = True
+        client_run.font.size = Pt(11.5)
+        client_run.font.color.rgb = PRIMARY_RGB
+
     if kpis:
         _add_kpi_row(document, kpis)
-    _add_summary(document, results)
+    _add_summary(document, results, lang)
 
     for result in results:
-        _add_section(document, result)
+        _add_section(document, result, lang)
     _add_signature(document)
 
     buffer = io.BytesIO()
