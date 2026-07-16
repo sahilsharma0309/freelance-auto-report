@@ -71,6 +71,20 @@ STRINGS: dict[str, dict[str, str]] = {
                              "while the other falls. Near 0: no real link.",
         "median": "median",
         # report chrome
+        # 3D & animation studio
+        "title_3d_scatter": "3D view — {x} × {y} × {z}",
+        "guide_3d_scatter": "Every dot is one record, placed by three measures at "
+                            "once. Drag (or swipe) to spin it — clusters of dots "
+                            "are records that behave alike.",
+        "title_3d_surface": "3D landscape — {col} by {cat} and month",
+        "guide_3d_surface": "Height = business. Peaks are the best group-month "
+                            "combos, valleys the quiet ones. Drag to rotate.",
+        "title_race": "Animated race — {col} by {cat}, month by month",
+        "guide_race": "Press ▶ Play and watch the bars grow month by month — "
+                      "you can see exactly when each group pulled ahead.",
+        "need_3_numeric": "3D scatter needs at least 3 numeric columns.",
+        "need_time_cat": "The 3D landscape and the animated race need a date "
+                         "column plus a category column.",
         "key_findings": "Key Findings",
         "how_to_read": "How to read",
         "prepared_for": "Prepared for",
@@ -134,6 +148,19 @@ STRINGS: dict[str, dict[str, str]] = {
                              "नीला +1 के पास: दोनों साथ बढ़ते हैं। सुनहरा -1 के पास: एक बढ़े "
                              "तो दूसरा घटे। 0 के पास: कोई ख़ास संबंध नहीं।",
         "median": "बीच का मान",
+        "title_3d_scatter": "3D नज़ारा — {x} × {y} × {z}",
+        "guide_3d_scatter": "हर बिंदु एक रिकॉर्ड है, तीन मापों पर एक साथ रखा हुआ। "
+                            "खींचकर (या स्वाइप करके) घुमाइए — पास-पास के बिंदु "
+                            "मिलते-जुलते रिकॉर्ड हैं।",
+        "title_3d_surface": "3D भू-दृश्य — {cat} और महीने के हिसाब से {col}",
+        "guide_3d_surface": "ऊँचाई = कारोबार। चोटियाँ सबसे अच्छे समूह-महीने हैं, "
+                            "घाटियाँ सबसे धीमे। खींचकर घुमाइए।",
+        "title_race": "एनिमेटेड रेस — {cat} के हिसाब से {col}, महीना-दर-महीना",
+        "guide_race": "▶ Play दबाइए और बार को महीने-दर-महीने बढ़ते देखिए — साफ़ "
+                      "दिखता है कौन कब आगे निकला।",
+        "need_3_numeric": "3D स्कैटर के लिए कम से कम 3 संख्या वाले कॉलम चाहिए।",
+        "need_time_cat": "3D भू-दृश्य और एनिमेटेड रेस के लिए तारीख़ वाला कॉलम और "
+                         "श्रेणी वाला कॉलम चाहिए।",
         "key_findings": "मुख्य निष्कर्ष",
         "how_to_read": "कैसे पढ़ें",
         "prepared_for": "के लिए तैयार",

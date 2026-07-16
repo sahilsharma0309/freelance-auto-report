@@ -198,8 +198,8 @@ def render(result: AnalysisResult) -> None:
 
 # ---------------------------------------------------------------- tabs
 if df is not None:
-    tab_dash, tab_ask, tab_export = st.tabs(
-        ["📊 Dashboard", "🤖 Ask AI", "📄 Export Report"]
+    tab_dash, tab_ask, tab_3d, tab_export = st.tabs(
+        ["📊 Dashboard", "🤖 Ask AI", "🧊 3D & Animation", "📄 Export Report"]
     )
 
     with tab_dash:
@@ -257,6 +257,28 @@ if df is not None:
         qa_results = [r for r in st.session_state.history if r.priority >= 9]
         for item in reversed(qa_results):
             render(item)
+
+    with tab_3d:
+        st.caption(
+            "Interactive showpieces — **drag / swipe to rotate** the 3D charts, "
+            "press **▶ Play** on the race. These live in the app only; the "
+            "printable report keeps the standard charts (they stay readable on paper)."
+        )
+        if st.button("🧊 Build 3D & animated visuals", type="primary",
+                     use_container_width=False):
+            from core.viz3d import studio_3d
+            with st.spinner("Building 3D scene..."):
+                results_3d, notes_3d = studio_3d(fdf.head(100_000), lang=lang)
+            st.session_state.studio3d = results_3d
+            st.session_state.studio3d_notes = notes_3d
+        for note in st.session_state.get("studio3d_notes", []):
+            st.info(note)
+        for item in st.session_state.get("studio3d", []):
+            st.markdown(f"**{item.question}**")
+            st.plotly_chart(item.figure, use_container_width=True)
+            if item.guide:
+                st.caption(f"📖 {item.guide}")
+            st.divider()
 
     with tab_export:
         if not st.session_state.history:
