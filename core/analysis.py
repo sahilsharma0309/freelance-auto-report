@@ -74,7 +74,14 @@ def load_dataframe(path: str | Path) -> pai.DataFrame:
     raise ValueError(f"Unsupported file type: {suffix} (use .csv, .xlsx or .xls)")
 
 
-def _chat_with_retry(df: pai.DataFrame, prompt: str, attempts: int = 3):
+FRIENDLY_RATE_LIMIT_MESSAGE = (
+    "⏳ The AI is busy right now (free-plan limit reached for this minute). "
+    "Wait about a minute and press Analyze again — or use the Dashboard tab, "
+    "which builds all charts without any AI."
+)
+
+
+def _chat_with_retry(df: pai.DataFrame, prompt: str, attempts: int = 4):
     """df.chat that waits out Groq free-tier rate limits instead of failing.
 
     Groq's error message includes "Please try again in Xs"; honor it,
@@ -108,7 +115,10 @@ def ask(df: pai.DataFrame, question: str) -> AnalysisResult:
     try:
         response = _chat_with_retry(df, question)
     except Exception as exc:  # pandasai raises many provider-specific errors
-        return AnalysisResult(question=question, kind="error", text=str(exc))
+        message = str(exc)
+        if "RateLimitError" in type(exc).__name__ or "rate_limit" in message:
+            message = FRIENDLY_RATE_LIMIT_MESSAGE
+        return AnalysisResult(question=question, kind="error", text=message)
 
     rtype = getattr(response, "type", "string")
 
