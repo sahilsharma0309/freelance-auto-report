@@ -2,9 +2,9 @@
 
 > **Upload a CSV/Excel file → ask a question in plain English → get the right chart + a written insight → export it all as a branded PDF or Word report.** An AI data analyst that replaces manual Power BI/Tableau work on freelance gigs.
 
-**🔗 Live demo:** _<!-- paste your Streamlit Cloud URL here, e.g. https://freelance-auto-report.streamlit.app -->_ &nbsp;·&nbsp; **⚙️ Stack:** Python · Streamlit · PandasAI v3 · Groq LLM · WeasyPrint
+**🔗 Live demo:** [sahilsharma0309-freelance-auto-report-app-pgypzo.streamlit.app](https://sahilsharma0309-freelance-auto-report-app-pgypzo.streamlit.app/) &nbsp;·&nbsp; **⚙️ Stack:** Python · Streamlit · PandasAI v3 · Groq LLM · WeasyPrint
 
-**Why it matters:** one upload replaces the whole manual loop — writing queries, building charts, and formatting a client-ready report by hand. _<!-- add your real freelance metric here, e.g. "cut per-report turnaround from ~2 hrs to under 5 min across 8 client gigs" — don't ship a made-up number -->_
+**Why it matters:** one upload replaces the whole manual loop — writing queries, building charts, and formatting a client-ready report by hand.
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B?logo=streamlit&logoColor=white)
