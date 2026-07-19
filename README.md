@@ -1,9 +1,16 @@
-# freelance-auto-report
+# 📊 freelance-auto-report
 
-Personal automated data-analysis tool for freelance data work: upload a
-CSV/Excel file, ask a question in plain English, and get the right chart plus
-a written insight — then export the whole thing as a branded PDF or Word
-report. A lightweight replacement for Power BI/Tableau on freelance gigs.
+> **Upload a CSV/Excel file → ask a question in plain English → get the right chart + a written insight → export it all as a branded PDF or Word report.** An AI data analyst that replaces manual Power BI/Tableau work on freelance gigs.
+
+**🔗 Live demo:** [sahilsharma0309-freelance-auto-report-app-pgypzo.streamlit.app](https://sahilsharma0309-freelance-auto-report-app-pgypzo.streamlit.app/) &nbsp;·&nbsp; **⚙️ Stack:** Python · Streamlit · PandasAI v3 · Groq LLM · WeasyPrint
+
+**Why it matters:** one upload replaces the whole manual loop — writing queries, building charts, and formatting a client-ready report by hand.
+
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B?logo=streamlit&logoColor=white)
+![Status](https://img.shields.io/badge/status-active-success)
+
+---
 
 ## Stack
 
