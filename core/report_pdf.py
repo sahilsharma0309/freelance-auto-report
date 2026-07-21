@@ -236,8 +236,59 @@ def build_html(results: list[AnalysisResult], title: str, dataset_name: str,
 </body></html>"""
 
 
+def password_strength(password: str) -> tuple[str, str]:
+    """Rate a password before it is used to encrypt a report.
+
+    Returns (level, message) with level 'weak' | 'fair' | 'strong'. The
+    encryption is only as strong as the password chosen, so this gate matters
+    as much as the algorithm — AES-256 is unbreakable in practice, but a short
+    or common password can still be guessed by cracking tools.
+    """
+    pw = password or ""
+    classes = sum((
+        any(c.islower() for c in pw),
+        any(c.isupper() for c in pw),
+        any(c.isdigit() for c in pw),
+        any(not c.isalnum() for c in pw),
+    ))
+    if len(pw) < 8 or classes < 2:
+        return "weak", ("Weak — use at least 12 characters mixing upper/lower case, "
+                        "numbers and symbols so no tool can guess it.")
+    if len(pw) < 12 or classes < 3:
+        return "fair", ("Fair — 12+ characters with a symbol would make it far harder "
+                        "to crack.")
+    return "strong", "Strong — this is infeasible to brute-force."
+
+
+def encrypt_pdf(pdf_bytes: bytes, password: str) -> bytes:
+    """Re-encrypt a PDF with AES-256 (PDF 2.0 / revision 6).
+
+    The result opens only with `password` in any standard reader. AES-256 with
+    a strong passphrase has no known practical break, so the password itself is
+    the real lock — there is no back door or owner bypass here (owner and user
+    passwords are set to the same value).
+    """
+    if not password:
+        return pdf_bytes
+    from io import BytesIO
+
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(BytesIO(pdf_bytes))
+    writer = PdfWriter()
+    writer.append(reader)
+    writer.encrypt(user_password=password, owner_password=password, algorithm="AES-256")
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
 def export_pdf(results: list[AnalysisResult], title: str, dataset_name: str,
-               kpis=None, client_name: str = "", lang: str = "en") -> bytes:
-    return HTML(
+               kpis=None, client_name: str = "", lang: str = "en",
+               password: str = "") -> bytes:
+    pdf = HTML(
         string=build_html(results, title, dataset_name, kpis, client_name, lang)
     ).write_pdf()
+    if password:
+        pdf = encrypt_pdf(pdf, password)
+    return pdf

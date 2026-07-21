@@ -48,6 +48,24 @@ STRINGS: dict[str, dict[str, str]] = {
                            "({value:+.2f}), which move {word} together "
                            "(navy = positive, gold = negative).",
         "positively": "positively", "negatively": "negatively",
+        # new-customer / campaign breakdowns (donut share + grouped/stacked combo)
+        "title_share": "{col} share by {cat}",
+        "ins_share": "{top} holds the largest share of {col} at {share:.1f}%; "
+                     "{second} is next at {second_share:.1f}%.",
+        "guide_share": "Each colored slice is one {cat}. A bigger slice means a "
+                       "bigger share of total {col} — the percentage is written on "
+                       "each slice.",
+        "title_combo": "{col} by {cat_a} and {cat_b}",
+        "title_combo_stacked": "{col} by {cat_a}, split by {cat_b}",
+        "ins_combo": "The strongest combination is {best_a} + {best_b} ({value}). "
+                     "Overall, {cat_b} '{lead}' leads with {lead_val}.",
+        "guide_combo": "Bars are grouped by {cat_a}; each color is one {cat_b} "
+                       "(see the legend). Taller bar = more {col}. Compare the colors "
+                       "inside a group to see which {cat_b} wins there.",
+        "guide_combo_stacked": "Each bar is one {cat_a}, split into colored parts by "
+                               "{cat_b}. A taller bar = more {col} in total; the "
+                               "colored portions show the mix.",
+        "other": "Other",
         # reading guides
         "guide_trend": "Read left to right — each point is one period's total. Line "
                        "going up means business is growing. The gold dot marks the latest figure.",
@@ -128,6 +146,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "ins_correlation": "सबसे मज़बूत संबंध {a} और {b} के बीच है ({value:+.2f}) — "
                            "ये {word} चलते हैं (नीला = साथ बढ़ते, सुनहरा = उल्टा)।",
         "positively": "साथ-साथ", "negatively": "उल्टे",
+        "title_share": "{cat} के हिसाब से {col} का हिस्सा",
+        "ins_share": "{top} का हिस्सा सबसे बड़ा है — कुल {col} का {share:.1f}%; "
+                     "इसके बाद {second} ({second_share:.1f}%)।",
+        "guide_share": "हर रंगीन टुकड़ा एक {cat} है। बड़ा टुकड़ा यानी कुल {col} में "
+                       "बड़ा हिस्सा — हर टुकड़े पर प्रतिशत लिखा है।",
+        "title_combo": "{cat_a} और {cat_b} के हिसाब से {col}",
+        "title_combo_stacked": "{cat_a} के हिसाब से {col}, {cat_b} में बँटा हुआ",
+        "ins_combo": "सबसे मज़बूत जोड़ी {best_a} + {best_b} है ({value})। "
+                     "कुल मिलाकर {cat_b} '{lead}' सबसे आगे है ({lead_val})।",
+        "guide_combo": "बार {cat_a} के हिसाब से समूह में हैं; हर रंग एक {cat_b} है "
+                       "(लेजेंड देखें)। ऊँची बार = ज़्यादा {col}। एक समूह के रंगों की आपस "
+                       "में तुलना करें कि वहाँ कौन सा {cat_b} आगे है।",
+        "guide_combo_stacked": "हर बार एक {cat_a} है, जो {cat_b} के हिसाब से रंगीन "
+                               "हिस्सों में बँटी है। ऊँची बार = कुल मिलाकर ज़्यादा {col}; "
+                               "रंगीन हिस्से मिश्रण दिखाते हैं।",
+        "other": "अन्य",
         "guide_trend": "बाएँ से दाएँ पढ़ें — हर बिंदु एक अवधि का कुल है। रेखा ऊपर जाए तो "
                        "कारोबार बढ़ रहा है। सुनहरा बिंदु सबसे ताज़ा आँकड़ा है।",
         "guide_growth": "हर बार पिछले महीने से तुलना है। रेखा के ऊपर नीली बार = पिछले महीने "

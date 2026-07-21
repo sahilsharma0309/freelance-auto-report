@@ -29,9 +29,10 @@ COMBINE_LABEL = "🔗 All files combined"
 # WeasyPrint needs system libraries (GTK3 on Windows, pango/cairo on Linux).
 # If they're missing, keep the app usable and only disable PDF export.
 try:
-    from core.report_pdf import export_pdf
+    from core.report_pdf import export_pdf, password_strength
 except OSError:
     export_pdf = None
+    password_strength = None
 
 st.set_page_config(page_title=BRAND_NAME, page_icon="📊", layout="wide")
 
@@ -295,11 +296,54 @@ if df is not None:
                 "story order (trend → growth → comparisons → rankings), each with "
                 "a plain-language 'How to read' line — made for non-technical clients."
             )
+
+            # ------------------------------------ optional PDF password
+            pdf_password = ""
+            pdf_password_confirm = ""
+            with st.expander("🔒 Password-protect the PDF (optional) / "
+                             "पीडीएफ़ पर पासवर्ड (वैकल्पिक)"):
+                st.caption(
+                    "Set a password to lock the PDF with **AES-256 encryption** — it "
+                    "then opens only with this password, in any PDF reader. Leave both "
+                    "boxes empty to download a normal PDF that opens without a password."
+                )
+                pw_col1, pw_col2 = st.columns(2)
+                with pw_col1:
+                    pdf_password = st.text_input(
+                        "PDF password / पासवर्ड", type="password", key="pdf_pw",
+                        placeholder="Leave empty for no password",
+                    )
+                with pw_col2:
+                    pdf_password_confirm = st.text_input(
+                        "Confirm password / दोबारा डालें", type="password",
+                        key="pdf_pw2", placeholder="Type the same password again",
+                    )
+                if pdf_password and password_strength is not None:
+                    level, message = password_strength(pdf_password)
+                    {"weak": st.warning, "fair": st.info, "strong": st.success}[level](
+                        f"Password strength: {message}"
+                    )
+                if pdf_password and pdf_password_confirm \
+                        and pdf_password != pdf_password_confirm:
+                    st.error("The two passwords don't match — fix this before generating.")
+                st.caption(
+                    "🛡️ **How safe is it?** AES-256 with a strong password can't be "
+                    "broken by any known tool — that is the real protection. A PDF "
+                    "can't literally self-destruct on someone else's device if they try "
+                    "to crack it (no standard file can), so a **strong password is what "
+                    "keeps it safe** — use the strength meter above to pick one. The "
+                    "Word file is not encrypted."
+                )
+
             # Two-step export: an explicit Generate click reads the final
             # title/client values, so a name typed just before downloading
             # is never lost to Streamlit's stale-rerun behavior.
             if st.button("🧾 Generate report files", type="primary",
                          use_container_width=True):
+                if pdf_password and pdf_password != pdf_password_confirm:
+                    st.error("PDF passwords don't match — please re-enter them and "
+                             "generate again.")
+                    st.stop()
                 results = story_order(st.session_state.history)
                 report_kpis = compute_kpis(fdf, lang) if fdf is not None else None
                 parts = [report_title.strip() or "report"]
@@ -316,8 +360,9 @@ if df is not None:
                             report_files["pdf"] = export_pdf(
                                 results, report_title, dataset_name,
                                 kpis=report_kpis, client_name=client_name.strip(),
-                                lang=lang,
+                                lang=lang, password=pdf_password or "",
                             )
+                            report_files["pdf_encrypted"] = bool(pdf_password)
                         except Exception as exc:
                             st.error(f"PDF export failed: {exc}")
                     try:
@@ -346,6 +391,9 @@ if df is not None:
                             file_name=f"{files['stem']}.pdf",
                             mime="application/pdf", use_container_width=True,
                         )
+                        if files.get("pdf_encrypted"):
+                            st.caption("🔒 AES-256 encrypted — this PDF asks for your "
+                                       "password when opened.")
                 with col_docx:
                     if "docx" in files:
                         st.download_button(

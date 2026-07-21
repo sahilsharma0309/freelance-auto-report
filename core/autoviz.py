@@ -13,7 +13,12 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from core.analysis import AnalysisResult
-from core.branding import ACCENT_COLOR, PRIMARY_COLOR, SERIES_PALETTE
+from core.branding import (
+    ACCENT_COLOR,
+    CATEGORICAL_PALETTE,
+    PRIMARY_COLOR,
+    SERIES_PALETTE,
+)
 from core.i18n import t
 from core.settings import CHARTS_DIR
 
@@ -320,6 +325,108 @@ def _bar_by_category(df, cat_col, val_col, lang="en") -> AnalysisResult:
     return _result(title, fig, insight, t("guide_bar", lang), priority=6)
 
 
+def _share_donut(df, cat_col, val_col, lang="en") -> AnalysisResult | None:
+    """Colorful donut showing each category's share of the total value —
+    the 'Sales by Channel' style split the client asks for."""
+    totals = df.groupby(cat_col)[val_col].sum()
+    totals = totals[totals > 0].sort_values(ascending=False)
+    if len(totals) < 2:
+        return None
+    if len(totals) > 6:
+        head = totals.head(5)
+        totals = pd.concat([head, pd.Series({t("other", lang): totals.iloc[5:].sum()})])
+
+    title = t("title_share", lang).format(col=val_col, cat=cat_col)
+    fig = _base_figure(title)
+    colors = CATEGORICAL_PALETTE[:len(totals)]
+    fig.add_trace(go.Pie(
+        labels=[str(i) for i in totals.index], values=totals.values, hole=0.55,
+        sort=False, direction="clockwise",
+        marker=dict(colors=colors, line=dict(color="white", width=2)),
+        textinfo="percent", textposition="inside", insidetextorientation="horizontal",
+        textfont=dict(color="white", size=13),
+        hovertemplate="%{label}: <b>%{value:,.0f}</b> (%{percent})<extra></extra>",
+    ))
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.08, x=0.5, xanchor="center",
+                    font=dict(color=MUTED, size=12)),
+        margin=dict(l=40, r=40, t=70, b=70),
+    )
+
+    total_sum = totals.sum()
+    insight = t("ins_share", lang).format(
+        top=totals.index[0], col=val_col, share=totals.iloc[0] / total_sum * 100,
+        second=totals.index[1], second_share=totals.iloc[1] / total_sum * 100,
+    )
+    return _result(title, fig, insight, t("guide_share", lang).format(cat=cat_col, col=val_col),
+                   priority=4)
+
+
+def _pick_combo_pair(df, categorical) -> tuple[str, str] | None:
+    """Choose two categoricals for a grouped/stacked combo: the one with the
+    fewest groups (2-4) becomes the colored series, another (2-8) the x-axis."""
+    counts = {c: df[c].nunique(dropna=True) for c in categorical}
+    series_opts = [c for c, n in counts.items() if 2 <= n <= 4]
+    if not series_opts:
+        return None
+    cat_b = min(series_opts, key=lambda c: counts[c])
+    axis_opts = [c for c, n in counts.items() if c != cat_b and 2 <= n <= 8]
+    if not axis_opts:
+        return None
+    cat_a = max(axis_opts, key=lambda c: counts[c])
+    return cat_a, cat_b
+
+
+def _combo_two_cats(df, cat_a, cat_b, val_col, lang="en") -> AnalysisResult | None:
+    """Grouped (or stacked, for a 2-group series) colored bars: value by
+    cat_a, split by cat_b — the campaign x channel 'combo' view."""
+    pivot = (
+        df.groupby([cat_a, cat_b])[val_col].sum()
+        .unstack(cat_b).fillna(0)
+    )
+    pivot = pivot.loc[pivot.sum(axis=1).sort_values(ascending=False).head(8).index]
+    pivot = pivot[pivot.sum(axis=0).sort_values(ascending=False).head(4).index]
+    if pivot.shape[0] < 2 or pivot.shape[1] < 2:
+        return None
+
+    stacked = pivot.shape[1] == 2
+    title = t("title_combo_stacked" if stacked else "title_combo", lang).format(
+        col=val_col, cat_a=cat_a, cat_b=cat_b)
+    fig = _base_figure(title)
+    labels = pivot.shape[0] * pivot.shape[1] <= 12
+    for idx, series in enumerate(pivot.columns):
+        values = pivot[series].values
+        fig.add_trace(go.Bar(
+            x=[str(r) for r in pivot.index], y=values, name=str(series),
+            marker=dict(color=CATEGORICAL_PALETTE[idx], line=dict(color="white", width=1.5)),
+            text=[_fmt(v) for v in values] if labels else None,
+            textposition="inside" if stacked else "outside",
+            textfont=dict(color="white" if stacked else MUTED, size=11),
+            cliponaxis=False,
+            hovertemplate=f"{series} · %{{x}}: <b>%{{y:,.0f}}</b><extra></extra>",
+        ))
+    fig.update_layout(
+        barmode="stack" if stacked else "group",
+        showlegend=True,
+        legend=dict(orientation="h", y=1.08, x=0, font=dict(color=MUTED)),
+        margin=dict(l=70, r=40, t=90, b=60),
+    )
+    fig.update_xaxes(showgrid=False)
+
+    matrix = pivot.values
+    best_i, best_j = np.unravel_index(np.argmax(matrix), matrix.shape)
+    col_totals = pivot.sum(axis=0)
+    insight = t("ins_combo", lang).format(
+        best_a=str(pivot.index[best_i]), best_b=str(pivot.columns[best_j]),
+        value=_fmt(matrix[best_i, best_j]), cat_b=cat_b,
+        lead=str(col_totals.idxmax()), lead_val=_fmt(col_totals.max()),
+    )
+    guide = t("guide_combo_stacked" if stacked else "guide_combo", lang).format(
+        cat_a=cat_a, cat_b=cat_b, col=val_col)
+    return _result(title, fig, insight, guide, priority=3)
+
+
 def _distribution(df, val_col, lang="en") -> AnalysisResult:
     values = df[val_col].dropna()
     title = t("title_distribution", lang).format(col=val_col)
@@ -387,6 +494,19 @@ def auto_visualize(df: pd.DataFrame, max_charts: int = 10,
                 chart = builder(df, datetime_cols[0], val_col, categorical[0], lang=lang)
                 if chart:
                     results.append(chart)
+    if val_col and categorical:
+        donut_col = next(
+            (c for c in categorical if 3 <= df[c].nunique(dropna=True) <= 8),
+            categorical[0],
+        )
+        share = _share_donut(df, donut_col, val_col, lang=lang)
+        if share:
+            results.append(share)
+        pair = _pick_combo_pair(df, categorical)
+        if pair:
+            combo = _combo_two_cats(df, pair[0], pair[1], val_col, lang=lang)
+            if combo:
+                results.append(combo)
     if val_col:
         for cat_col in categorical[:3]:
             results.append(_bar_by_category(df, cat_col, val_col, lang=lang))
