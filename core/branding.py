@@ -13,10 +13,27 @@ WATERMARK_TEXT = "Prepared by Sahil"
 # Very light diagonal watermark repeated on every report page
 PAGE_WATERMARK_TEXT = "Sahil Sharma"
 
-# Multi-series chart palette (fixed order, never cycled). Chart-tuned
-# variants of the brand hues - validated for colorblind separation and
-# contrast; the raw brand navy/gold are kept for single-series marks.
-SERIES_PALETTE = ["#3D5C9E", "#A8862F", "#00969B"]
+# Colorful categorical palette (fixed order, never cycled) for charts that
+# show several groups at once — donut shares, grouped/stacked combos, and
+# multi-line comparisons. These eight hues are validated for colorblind
+# separation and on-white contrast (adjacent-pair CVD ΔE ≥ 9, normal-vision
+# ΔE ≥ 19); every chart that uses them also carries direct value labels, so
+# the low-contrast slots stay legible. The raw brand navy/gold
+# (PRIMARY/ACCENT) are still used for single-series and highlight marks.
+CATEGORICAL_PALETTE = [
+    "#2a78d6",  # blue
+    "#eb6834",  # orange
+    "#1baf7a",  # aqua
+    "#eda100",  # yellow
+    "#e87ba4",  # magenta
+    "#008300",  # green
+    "#4a3aa7",  # violet
+    "#e34948",  # red
+]
+
+# Multi-line comparison charts cap at five series for readability; a subset
+# of the validated order keeps every adjacent pair inside the same gates.
+SERIES_PALETTE = CATEGORICAL_PALETTE[:5]
 
 # Drop your real logo at this path; reports fall back to a monogram until then.
 LOGO_PATH = PROJECT_ROOT / "assets" / "logo.png"

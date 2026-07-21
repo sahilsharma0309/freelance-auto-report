@@ -20,6 +20,7 @@
 - **Streamlit** for the UI
 - **WeasyPrint** for branded PDF export
 - **python-docx** for branded Word export
+- **pypdf** (AES-256) for optional PDF password protection
 
 ## Setup
 
@@ -54,10 +55,48 @@ streamlit run app.py
 ```
 
 1. Upload a `.csv` / `.xlsx` / `.xls` file
-2. Type a question, e.g. *"Plot monthly revenue by region as a bar chart"*
+2. Click **Build dashboard** for an instant, LLM-free chart set, or type a
+   question in **Ask AI**, e.g. *"Plot monthly revenue by region as a bar chart"*
 3. Get the chart + a written insight; results stack up as a session history
 4. Set a report title and download the whole session as a branded **PDF** or
-   **Word** report
+   **Word** report — optionally password-protecting the PDF
+
+## Campaign / marketing charts
+
+The **Build dashboard** button auto-detects marketing-campaign data (channels,
+campaigns, customer type, sales) and adds colorful, client-ready views on top of
+the standard trend/growth/ranking charts:
+
+- **Share donut** — each channel's or campaign's share of total sales
+  (e.g. *Email 51% · Instagram 29% · Website Banner 20%*)
+- **Grouped / stacked combo** — sales by one dimension split by another
+  (e.g. *Sales by Channel, split by Campaign*), which answers the classic
+  *"which campaign + channel combo should we double down on?"* question and
+  automatically calls out the strongest combination and the leading segment
+
+Colors use a fixed, colorblind-safe categorical palette; every chart carries
+direct value labels so it stays readable in print and for non-technical clients.
+All titles, insights and reading guides follow the sidebar language (English /
+हिंदी).
+
+## PDF password protection
+
+On the **Export Report** tab, expand **🔒 Password-protect the PDF** to set an
+optional password:
+
+- **Leave it empty** → a normal PDF that opens without a password.
+- **Set a password** → the PDF is encrypted with **AES-256 (PDF 2.0 / R6)** and
+  opens only with that password, in any standard reader (Acrobat, Chrome,
+  Preview, mobile). A strength meter helps you pick a password that holds up.
+
+**How safe is it, honestly?** AES-256 with a *strong* password has no known
+practical break — brute-forcing it is infeasible for any tool, so the password
+itself is the real lock (there's no owner-password back door here). What no
+standard PDF can do is *self-destruct* or erase itself if someone tries to crack
+it on their own device — a PDF is passive data, so once a copy leaves your hands
+nothing in the file can run to wipe it. Anyone promising a self-wiping PDF is
+overselling. The genuine protection is **strong AES-256 encryption + a strong
+passphrase**, which this gives you; the Word export is not encrypted.
 
 ## Branding
 
@@ -93,3 +132,5 @@ Schedule it weekly:
 - [x] Step 2 — MVP: upload → PandasAI Q&A → chart in Streamlit
 - [x] Step 3 — branded PDF export (WeasyPrint HTML/CSS template)
 - [x] Step 4 — branded Word export (python-docx template)
+- [x] Step 5 — colorful campaign charts (share donut + grouped/stacked combo)
+- [x] Step 6 — optional AES-256 password protection for exported PDFs
